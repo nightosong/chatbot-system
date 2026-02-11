@@ -1,0 +1,749 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(255, 105, 180, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.9);
+  border: 3px solid rgba(255, 182, 193, 0.6);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+  backdrop-filter: blur(20px);
+  position: relative;
+  z-index: 100000;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid rgba(255, 182, 193, 0.3);
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.1) 0%, rgba(173, 216, 230, 0.1) 100%);
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #ff69b4;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(255, 105, 180, 0.2);
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #ff69b4;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 105, 180, 0.1);
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* 模型列表指导提示 */
+.model-list-guidance {
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.9) 0%, rgba(240, 248, 255, 0.9) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.6);
+  border-radius: 12px;
+  padding: 0.8rem 1.2rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #ff69b4;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.2);
+  animation: pulse-guidance 3s ease-in-out infinite;
+}
+
+@keyframes pulse-guidance {
+  0%, 100% { box-shadow: 0 4px 15px rgba(255, 105, 180, 0.2); }
+  50% { box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4); }
+}
+
+.guidance-icon {
+  font-size: 1.2rem;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+}
+
+.guidance-text {
+  flex: 1;
+}
+
+.guidance-check {
+  display: inline-block;
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  color: white;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  font-weight: 700;
+  margin: 0 0.2rem;
+  box-shadow: 0 1px 3px rgba(255, 105, 180, 0.3);
+}
+
+.models-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #ff9a9e;
+}
+
+.empty-state p {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.empty-hint {
+  font-size: 0.9rem !important;
+  opacity: 0.8;
+}
+
+.model-card {
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.6) 0%, rgba(240, 248, 255, 0.6) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.3);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.model-card.default {
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  background: linear-gradient(135deg, rgba(255, 250, 205, 0.8) 0%, rgba(255, 248, 220, 0.8) 100%);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.model-card.default::before {
+  content: '⭐';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 1.2rem;
+  opacity: 0.6;
+  animation: sparkle-default 2s ease-in-out infinite;
+}
+
+@keyframes sparkle-default {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2) rotate(180deg);
+  }
+}
+
+.model-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 105, 180, 0.2);
+  border-color: rgba(255, 105, 180, 0.4);
+}
+
+.model-card.default:hover {
+  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
+  border-color: rgba(255, 215, 0, 0.8);
+}
+
+.model-card.disabled {
+  opacity: 0.5;
+  filter: grayscale(0.5);
+}
+
+/* 未选中的模型卡片 - 更暗淡 */
+.model-card.inactive {
+  opacity: 0.35;
+  filter: grayscale(0.8) brightness(0.95);
+  background: linear-gradient(135deg, rgba(230, 230, 230, 0.7) 0%, rgba(240, 240, 240, 0.7) 100%);
+  border-color: rgba(200, 200, 200, 0.3);
+}
+
+.model-card.inactive:hover {
+  opacity: 0.55;
+  filter: grayscale(0.6) brightness(0.98);
+  transform: translateY(-2px);
+}
+
+/* 选中的默认模型卡片 - 更显眼 */
+.model-card.active-default {
+  border-color: #ffd700;
+  border-width: 3px;
+  background: linear-gradient(135deg, rgba(255, 250, 205, 1) 0%, rgba(255, 240, 245, 1) 100%);
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.5), 0 0 0 1px rgba(255, 215, 0, 0.3);
+  opacity: 1;
+  filter: none;
+  transform: scale(1.02);
+}
+
+.model-card.active-default:hover {
+  box-shadow: 0 10px 35px rgba(255, 215, 0, 0.6);
+  border-color: #ffd700;
+}
+
+.model-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.model-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.model-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.model-details {
+  flex: 1;
+}
+
+.model-platform {
+  font-weight: 700;
+  color: #ff69b4;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.default-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #ff8c00;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 215, 0, 0.6);
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.3);
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.model-name {
+  font-size: 0.85rem;
+  color: #ff9a9e;
+  font-weight: 500;
+}
+
+.model-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start; /* 顶部对齐 */
+}
+
+/* 选择按钮包装器 */
+.select-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* 选择标签 */
+.select-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffb6c1;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.select-wrapper:hover .select-label {
+  color: #ff69b4;
+  transform: scale(1.05);
+}
+
+/* 选中状态的标签 */
+.radio-select-button.selected ~ .select-label {
+  color: #ffd700;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(255, 215, 0, 0.3);
+}
+
+
+/* 互斥单选按钮样式 - 恢复粉色打对号风格 */
+.radio-select-button {
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(255, 182, 193, 0.4);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  padding: 0;
+  position: relative;
+}
+
+/* 未选中按钮的呼吸动画提示 */
+.radio-select-button:not(.selected) {
+  animation: button-breathe 3s ease-in-out infinite;
+}
+
+@keyframes button-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 182, 193, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 182, 193, 0.3);
+  }
+}
+
+.radio-select-button:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.4);
+  animation: none;
+}
+
+.radio-select-button:hover::after {
+  content: '点击选择';
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 105, 180, 0.95);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(255, 105, 180, 0.4);
+  animation: tooltip-fade-in 0.2s ease;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.radio-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.radio-dot {
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+/* 未选中状态 - 空心圆圈 */
+.radio-select-button .radio-dot::before {
+  content: '○';
+  color: #ccc;
+}
+
+/* 选中状态 - 粉色打对号 */
+.radio-select-button.selected {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  border-color: #ff69b4;
+  color: white;
+}
+
+.radio-select-button.selected .radio-dot::before {
+  content: '✓';
+  color: white;
+}
+
+.delete-button {
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.3) 0%, rgba(255, 240, 245, 0.3) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.4);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  padding: 0;
+  margin-top: 0; /* 重置 margin */
+  color: #ff69b4;
+  box-shadow: 0 2px 8px rgba(255, 105, 180, 0.15);
+  position: relative;
+  overflow: visible;
+}
+
+/* 删除图标样式 */
+.delete-button .delete-icon {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+/* 添加可爱的心形装饰 */
+.delete-button::before {
+  content: '💔';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform: scale(0) rotate(-45deg);
+}
+
+/* 添加闪光效果 */
+.delete-button::after {
+  content: '✨';
+  position: absolute;
+  bottom: -8px;
+  left: -8px;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform: scale(0) rotate(45deg);
+}
+
+.delete-button:hover {
+  opacity: 1;
+  background: linear-gradient(135deg, #ff6b9d 0%, #ffa8c5 100%);
+  border-color: #ff69b4;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4);
+  transform: scale(1.15);
+  animation: shake-delete-model 0.5s ease;
+}
+
+.delete-button:hover .delete-icon {
+  transform: rotate(90deg);
+}
+
+.delete-button:hover::before {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: float-heart-model 2s ease-in-out infinite;
+}
+
+.delete-button:hover::after {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: twinkle-model 1.5s ease-in-out infinite;
+}
+
+/* 点击时的反馈动画 */
+.delete-button:active {
+  transform: scale(0.95);
+}
+
+/* 摇晃动画 */
+@keyframes shake-delete-model {
+  0%, 100% { transform: scale(1.15) rotate(0deg); }
+  25% { transform: scale(1.15) rotate(-5deg); }
+  50% { transform: scale(1.15) rotate(5deg); }
+  75% { transform: scale(1.15) rotate(-3deg); }
+}
+
+/* 心形浮动 */
+@keyframes float-heart-model {
+  0%, 100% {
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: scale(1.1) rotate(10deg) translateY(-3px);
+  }
+}
+
+/* 闪烁动画 */
+@keyframes twinkle-model {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3) rotate(180deg);
+  }
+}
+
+/* 添加新模型表单 - 居中显示，隐藏列表 */
+.add-model-form {
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.95) 0%, rgba(240, 248, 255, 0.95) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.5);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 0;
+  animation: form-slide-in 0.3s ease;
+  box-shadow: 0 8px 24px rgba(255, 105, 180, 0.3);
+}
+
+@keyframes form-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.add-model-form h3 {
+  margin: 0 0 1.25rem 0;
+  color: #ff69b4;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #ff69b4;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid rgba(255, 182, 193, 0.3);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #ff69b4;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #ff69b4;
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.1);
+}
+
+.form-input::placeholder {
+  color: #ffb6c1;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 182, 193, 0.3);
+  color: #ff9a9e;
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 182, 193, 0.2);
+  border-color: #ff9a9e;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  border-color: #ff69b4;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 105, 180, 0.4);
+}
+
+.add-model-button {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.2) 0%, rgba(173, 216, 230, 0.2) 100%);
+  border: 2px dashed rgba(255, 182, 193, 0.4);
+  border-radius: 12px;
+  color: #ff69b4;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.add-model-button:hover {
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.3) 0%, rgba(173, 216, 230, 0.3) 100%);
+  border-color: #ff69b4;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 105, 180, 0.2);
+}
+
+/* Scrollbar styling for modal */
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(255, 240, 245, 0.5);
+  border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .modal-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.25rem;
+  }
+
+  .model-card {
+    padding: 0.875rem 1rem;
+  }
+
+  .model-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1.5rem;
+  }
+
+  .add-model-form {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .model-header {
+    flex-wrap: wrap;
+  }
+
+  .model-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}

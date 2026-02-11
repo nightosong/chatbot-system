@@ -1,0 +1,299 @@
+.conversation-list-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 182, 193, 0.3);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: flex-start;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.conversation-list {
+  width: 400px;
+  max-width: 90vw;
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.98) 0%, rgba(240, 248, 255, 0.98) 100%);
+  box-shadow: 4px 0 30px rgba(255, 105, 180, 0.3);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  border-right: 3px solid rgba(255, 182, 193, 0.5);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.conversation-list-header {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffecd2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 3px solid rgba(255, 255, 255, 0.5);
+}
+
+.conversation-list-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(255, 105, 180, 0.3);
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  transform: scale(1.2) rotate(90deg);
+  background: white;
+  color: #ff69b4;
+}
+
+.conversation-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 30px,
+      rgba(255, 182, 193, 0.03) 30px,
+      rgba(255, 182, 193, 0.03) 60px
+    );
+}
+
+.no-conversations {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #ffb6c1;
+}
+
+.no-conversations p {
+  margin: 0.5rem 0;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.no-conversations .hint {
+  font-size: 0.9rem;
+  color: #ffc0cb;
+}
+
+.conversation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 0.8rem;
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.6) 0%, rgba(240, 248, 255, 0.6) 100%);
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(255, 182, 193, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.conversation-item::before {
+  content: '✨';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 1rem;
+  opacity: 0.3;
+}
+
+.conversation-item:hover {
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.3) 0%, rgba(173, 216, 230, 0.3) 100%);
+  transform: translateX(8px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.2);
+  border-color: #ff69b4;
+}
+
+/* 悬停时删除按钮更明显 */
+.conversation-item:hover .delete-btn {
+  opacity: 0.9;
+  animation: bounce-hint 0.6s ease;
+}
+
+@keyframes bounce-hint {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.conversation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-title {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ff69b4;
+}
+
+.conversation-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: #ffb6c1;
+  font-weight: 500;
+}
+
+.delete-btn {
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.3) 0%, rgba(255, 240, 245, 0.3) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.4);
+  border-radius: 50%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+  transition: all 0.3s ease;
+  color: #ff69b4;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(255, 105, 180, 0.15);
+  overflow: visible;
+}
+
+/* 删除图标样式 */
+.delete-icon {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+/* 添加可爱的心形装饰 */
+.delete-btn::before {
+  content: '💔';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform: scale(0) rotate(-45deg);
+}
+
+/* 添加闪光效果 */
+.delete-btn::after {
+  content: '✨';
+  position: absolute;
+  bottom: -8px;
+  left: -8px;
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform: scale(0) rotate(45deg);
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  background: linear-gradient(135deg, #ff6b9d 0%, #ffa8c5 100%);
+  border-color: #ff69b4;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.4);
+  animation: shake-delete 0.5s ease;
+}
+
+.delete-btn:hover .delete-icon {
+  transform: rotate(90deg);
+}
+
+.delete-btn:hover::before {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: float-heart 2s ease-in-out infinite;
+}
+
+.delete-btn:hover::after {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  animation: twinkle 1.5s ease-in-out infinite;
+}
+
+/* 点击时的反馈动画 */
+.delete-btn:active {
+  transform: scale(0.95);
+}
+
+/* 摇晃动画 */
+@keyframes shake-delete {
+  0%, 100% { transform: scale(1.15) rotate(0deg); }
+  25% { transform: scale(1.15) rotate(-5deg); }
+  50% { transform: scale(1.15) rotate(5deg); }
+  75% { transform: scale(1.15) rotate(-3deg); }
+}
+
+/* 心形浮动 */
+@keyframes float-heart {
+  0%, 100% {
+    transform: scale(1) rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: scale(1.1) rotate(10deg) translateY(-3px);
+  }
+}
+
+/* 闪烁动画 */
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3) rotate(180deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .conversation-list {
+    width: 100%;
+    max-width: 100vw;
+  }
+}

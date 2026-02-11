@@ -1,0 +1,229 @@
+/* 隐藏默认鼠标 */
+* {
+  cursor: none !important;
+}
+
+/* 外圈光晕 */
+.custom-cursor {
+  position: fixed;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  transition: transform 0.15s ease-out, opacity 0.15s ease;
+}
+
+.cursor-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 154, 158, 0.5) 0%,
+    rgba(254, 207, 239, 0.3) 40%,
+    transparent 70%
+  );
+  border: 2.5px solid rgba(255, 105, 180, 0.7);
+  animation: cursor-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 105, 180, 0.4),
+              inset 0 0 8px rgba(255, 182, 193, 0.3);
+}
+
+/* 中心可爱图标 */
+.cursor-dot {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  z-index: 100000;
+  transform: translate(-50%, -50%);
+  transition: left 0.1s ease-out, top 0.1s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cursor-icon {
+  font-size: 0.9rem;
+  display: block;
+  animation: cursor-rotate 4s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 154, 158, 0.8))
+          drop-shadow(0 2px 6px rgba(255, 105, 180, 0.5));
+}
+
+/* 悬停状态 */
+.custom-cursor.cursor-hover {
+  transform: translate(-50%, -50%) scale(1.6);
+}
+
+.custom-cursor.cursor-hover .cursor-ring {
+  background: radial-gradient(
+    circle,
+    rgba(255, 105, 180, 0.6) 0%,
+    rgba(254, 207, 239, 0.4) 40%,
+    transparent 70%
+  );
+  border-color: rgba(255, 105, 180, 0.9);
+  border-width: 3px;
+  animation: cursor-pulse-fast 1s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(255, 105, 180, 0.6),
+              inset 0 0 10px rgba(255, 182, 193, 0.4);
+}
+
+.custom-cursor.cursor-hover ~ .cursor-dot .cursor-icon {
+  content: '💕';
+  animation: cursor-bounce 0.5s ease-in-out infinite;
+  font-size: 1.1rem;
+}
+
+/* 点击状态 */
+.custom-cursor.cursor-click {
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.custom-cursor.cursor-click .cursor-ring {
+  background: radial-gradient(
+    circle,
+    rgba(255, 105, 180, 0.6) 0%,
+    rgba(254, 207, 239, 0.4) 40%,
+    transparent 70%
+  );
+}
+
+/* 动画 */
+@keyframes cursor-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes cursor-pulse-fast {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes cursor-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cursor-bounce {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.2) translateY(-2px);
+  }
+}
+
+/* 添加跟随轨迹效果 */
+.cursor-dot::before {
+  content: '';
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 182, 193, 0.5) 0%,
+    rgba(255, 154, 158, 0.3) 30%,
+    transparent 60%
+  );
+  animation: cursor-glow 2s ease-in-out infinite;
+}
+
+@keyframes cursor-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.9;
+  }
+}
+
+/* 移动端隐藏自定义鼠标 */
+@media (max-width: 768px), (hover: none) {
+  .custom-cursor,
+  .cursor-dot {
+    display: none;
+  }
+  
+  * {
+    cursor: auto !important;
+  }
+}
+
+/* 为输入框添加特殊样式 */
+input:focus ~ .custom-cursor .cursor-ring,
+textarea:focus ~ .custom-cursor .cursor-ring {
+  border-color: rgba(173, 216, 230, 0.6);
+  background: radial-gradient(
+    circle,
+    rgba(173, 216, 230, 0.3) 0%,
+    rgba(168, 237, 234, 0.2) 40%,
+    transparent 70%
+  );
+}
+
+/* 添加星星装饰 */
+.cursor-ring::before {
+  content: '⭐';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 0.6rem;
+  opacity: 0.7;
+  animation: twinkle 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.6));
+}
+
+.cursor-ring::after {
+  content: '💫';
+  position: absolute;
+  bottom: -6px;
+  left: -6px;
+  font-size: 0.6rem;
+  opacity: 0.7;
+  animation: twinkle 2s ease-in-out infinite 1s;
+  filter: drop-shadow(0 0 3px rgba(255, 182, 193, 0.6));
+}
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3) rotate(180deg);
+  }
+}
+
+/* 悬停时改变星星 */
+.custom-cursor.cursor-hover .cursor-ring::before {
+  content: '🌸';
+  filter: drop-shadow(0 0 4px rgba(255, 182, 193, 0.8));
+}
+
+.custom-cursor.cursor-hover .cursor-ring::after {
+  content: '💕';
+  filter: drop-shadow(0 0 4px rgba(255, 105, 180, 0.8));
+}

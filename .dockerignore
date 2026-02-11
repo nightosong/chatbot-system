@@ -1,0 +1,33 @@
+# Git
+.git/
+.gitignore
+
+# Docker files
+**/Dockerfile
+**/docker-compose.yml
+**/.dockerignore
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+.coverage
+htmlcov/
+
+# Tests (optional, uncomment if you don't want tests in image)
+# **/tests/
+# **/*.test.ts
+# **/*.test.tsx

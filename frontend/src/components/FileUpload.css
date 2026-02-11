@@ -1,0 +1,50 @@
+.file-upload {
+  margin-bottom: 0.5rem;
+}
+
+.upload-btn {
+  padding: 0.7rem 1.2rem;
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.8) 0%, rgba(240, 248, 255, 0.8) 100%);
+  border: 2px dashed rgba(255, 105, 180, 0.4);
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  color: #ff69b4;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.upload-btn:hover:not(:disabled) {
+  border-color: #ff69b4;
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.3) 0%, rgba(173, 216, 230, 0.3) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.2);
+}
+
+.upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upload-error {
+  margin-top: 0.5rem;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(135deg, rgba(255, 182, 193, 0.2) 0%, rgba(255, 192, 203, 0.2) 100%);
+  color: #ff1493;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  border: 2px solid rgba(255, 20, 147, 0.3);
+  font-weight: 600;
+}
+
+.upload-info {
+  margin-top: 0.5rem;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.2) 0%, rgba(176, 224, 230, 0.2) 100%);
+  color: #4682b4;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  border: 2px solid rgba(70, 130, 180, 0.3);
+  font-weight: 600;
+}

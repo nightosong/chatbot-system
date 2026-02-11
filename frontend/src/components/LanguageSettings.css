@@ -1,0 +1,188 @@
+/* 语言设置模态框特定样式 */
+.language-modal .modal-content {
+  max-width: 500px;
+}
+
+/* 语言提示 */
+.language-hint {
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.9) 0%, rgba(240, 248, 255, 0.9) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.6);
+  border-radius: 12px;
+  padding: 0.8rem 1.2rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: #ff69b4;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 15px rgba(255, 105, 180, 0.2);
+}
+
+.hint-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.hint-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* 语言列表 */
+.language-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* 语言卡片 */
+.language-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(255, 240, 245, 0.6) 0%, rgba(240, 248, 255, 0.6) 100%);
+  border: 2px solid rgba(255, 182, 193, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.language-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 105, 180, 0.3);
+  border-color: rgba(255, 105, 180, 0.5);
+}
+
+/* 选中的语言卡片 */
+.language-card.selected {
+  background: linear-gradient(135deg, rgba(255, 250, 205, 1) 0%, rgba(255, 240, 245, 1) 100%);
+  border-color: #ffd700;
+  border-width: 3px;
+  box-shadow: 0 6px 25px rgba(255, 215, 0, 0.4);
+  transform: scale(1.02);
+}
+
+.language-card.selected:hover {
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 0.5);
+}
+
+/* 语言图标 */
+.language-icon {
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(255, 105, 180, 0.15);
+  flex-shrink: 0;
+}
+
+.language-card.selected .language-icon {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(255, 250, 205, 0.8) 100%);
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+/* 语言信息 */
+.language-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.language-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ff69b4;
+}
+
+.language-card.selected .language-label {
+  color: #ff8c00;
+}
+
+.language-code {
+  font-size: 0.8rem;
+  color: #ffb6c1;
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+}
+
+.language-card.selected .language-code {
+  color: #ffa500;
+}
+
+/* 选中指示器 */
+.selected-indicator {
+  font-size: 1.5rem;
+  color: #ffd700;
+  animation: check-bounce 0.5s ease;
+  flex-shrink: 0;
+}
+
+@keyframes check-bounce {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 语言说明 */
+.language-note {
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.3) 0%, rgba(240, 248, 255, 0.5) 100%);
+  border: 2px solid rgba(173, 216, 230, 0.5);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: #4682b4;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.note-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.note-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .language-card {
+    padding: 0.875rem 1rem;
+  }
+
+  .language-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+
+  .language-label {
+    font-size: 0.95rem;
+  }
+
+  .language-code {
+    font-size: 0.75rem;
+  }
+}

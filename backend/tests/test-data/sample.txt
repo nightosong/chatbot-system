@@ -1,0 +1,22 @@
+AI Chat System Test Document
+
+This is a sample text file for testing the file upload functionality.
+
+Key Features:
+1. Multi-turn conversations with context awareness
+2. File upload support for txt, md, and pdf formats
+3. Persistent conversation history using SQLite
+4. Modern React-based user interface
+5. Support for multiple LLM providers
+
+Technical Stack:
+- Backend: FastAPI (Python)
+- Frontend: React + TypeScript
+- Database: SQLite
+- Testing: pytest, Jest
+
+Use this file to test the AI's ability to answer questions about uploaded documents.
+For example, you can ask:
+- "What are the key features mentioned?"
+- "What is the technical stack?"
+- "How many LLM providers are supported?"
