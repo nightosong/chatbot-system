@@ -13,6 +13,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>(() => agentConfigService.getMode());
+  const [chatKey, setChatKey] = useState<number>(0); // 用于强制刷新 ChatWindow
 
   // Load conversations on mount
   useEffect(() => {
@@ -31,6 +32,7 @@ function App() {
   const handleNewChat = () => {
     setCurrentConversationId(null);
     setShowHistory(false);
+    setChatKey(prev => prev + 1); // 强制刷新 ChatWindow
   };
 
   const handleSelectConversation = (conversationId: string) => {
@@ -95,6 +97,7 @@ function App() {
         )}
 
         <ChatWindow
+          key={chatKey}
           conversationId={currentConversationId}
           onConversationUpdate={handleConversationUpdate}
           onConversationIdChange={handleConversationIdChange}

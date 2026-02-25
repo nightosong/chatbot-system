@@ -54,7 +54,7 @@
 
 /* 悬停状态 */
 .custom-cursor.cursor-hover {
-  transform: translate(-50%, -50%) scale(1.6);
+  transform: translate(-50%, -50%) scale(1.2);
 }
 
 .custom-cursor.cursor-hover .cursor-ring {
@@ -74,7 +74,7 @@
 .custom-cursor.cursor-hover ~ .cursor-dot .cursor-icon {
   content: '💕';
   animation: cursor-bounce 0.5s ease-in-out infinite;
-  font-size: 1.1rem;
+  font-size: 1.0rem;
 }
 
 /* 点击状态 */
