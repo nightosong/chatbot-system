@@ -20,7 +20,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
+  background-image:
     radial-gradient(circle at 10% 20%, rgba(255, 182, 193, 0.05) 0%, transparent 30%),
     radial-gradient(circle at 90% 80%, rgba(173, 216, 230, 0.05) 0%, transparent 30%),
     radial-gradient(circle at 50% 50%, rgba(255, 218, 185, 0.05) 0%, transparent 40%);
@@ -35,14 +35,12 @@
   padding: 2rem;
   position: relative;
   z-index: 1;
-  background-image: 
-    repeating-linear-gradient(
-      0deg,
+  background-image:
+    repeating-linear-gradient(0deg,
       transparent,
       transparent 40px,
       rgba(255, 182, 193, 0.02) 40px,
-      rgba(255, 182, 193, 0.02) 80px
-    );
+      rgba(255, 182, 193, 0.02) 80px);
 }
 
 .welcome-message {
@@ -104,12 +102,10 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.8) 50%,
-    transparent 70%
-  );
+  background: linear-gradient(45deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.8) 50%,
+      transparent 70%);
   transform: translateX(-100%);
   transition: transform 0.6s ease;
 }
@@ -229,21 +225,49 @@
 }
 
 @keyframes pulse-chat {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.15);
+  }
 }
 
 @keyframes bounce-file {
-  0%, 100% { transform: translateY(0); }
-  25% { transform: translateY(-10px); }
-  50% { transform: translateY(0); }
-  75% { transform: translateY(-5px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  25% {
+    transform: translateY(-10px);
+  }
+
+  50% {
+    transform: translateY(0);
+  }
+
+  75% {
+    transform: translateY(-5px);
+  }
 }
 
 @keyframes rotate-history {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.1); }
-  100% { transform: rotate(360deg) scale(1); }
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
 }
 
 .chat-input-container {
@@ -284,30 +308,18 @@
   transform: scale(1.2) rotate(90deg);
 }
 
-/* 添加可爱的星星装饰 */
-.chat-content::before {
-  content: '⭐';
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  font-size: 1.5rem;
-  opacity: 0.3;
-  animation: twinkle 3s infinite ease-in-out;
-}
-
-.chat-content::after {
-  content: '💫';
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  font-size: 1.5rem;
-  opacity: 0.3;
-  animation: twinkle 3s infinite ease-in-out 1.5s;
-}
-
 @keyframes twinkle {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.2); }
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
 }
 
 /* 添加渐变边框动画 */
@@ -315,9 +327,11 @@
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -337,21 +351,21 @@
 
 /* 添加悬停时的边框光效 */
 .feature-chat:hover {
-  box-shadow: 
+  box-shadow:
     0 15px 40px rgba(255, 105, 180, 0.4),
     0 0 20px rgba(255, 154, 158, 0.3),
     inset 0 0 20px rgba(255, 182, 193, 0.1);
 }
 
 .feature-file:hover {
-  box-shadow: 
+  box-shadow:
     0 15px 40px rgba(168, 237, 234, 0.4),
     0 0 20px rgba(168, 237, 234, 0.3),
     inset 0 0 20px rgba(168, 237, 234, 0.1);
 }
 
 .feature-history:hover {
-  box-shadow: 
+  box-shadow:
     0 15px 40px rgba(255, 236, 210, 0.4),
     0 0 20px rgba(252, 182, 159, 0.3),
     inset 0 0 20px rgba(255, 236, 210, 0.1);
@@ -371,8 +385,15 @@
 }
 
 @keyframes float-icon {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
 }
 
 @media (max-width: 1024px) {
@@ -636,10 +657,13 @@
 }
 
 @keyframes run-dot-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     box-shadow: 0 0 0 1px rgba(122, 157, 214, 0.5);
   }
+
   50% {
     transform: scale(1.25);
     box-shadow: 0 0 0 4px rgba(122, 157, 214, 0.18);
@@ -719,10 +743,14 @@
 }
 
 @keyframes step-run-dot {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     opacity: 0.35;
     transform: translateY(0);
   }
+
   40% {
     opacity: 1;
     transform: translateY(-2px);
@@ -860,10 +888,14 @@
 }
 
 @keyframes dot-pulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     opacity: 0.3;
     transform: scale(0.8);
   }
+
   40% {
     opacity: 1;
     transform: scale(1.2);
@@ -884,6 +916,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -923,6 +956,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -977,6 +1011,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }

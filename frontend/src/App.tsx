@@ -56,7 +56,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>💕 AI 聊天助手 ✨</h1>
+        <h1>Emoji Studio ✨</h1>
         <div className="header-buttons">
           <div className="mode-switch">
             <button

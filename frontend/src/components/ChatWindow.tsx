@@ -38,8 +38,8 @@ interface MediaPreviewItem {
   coverUrl?: string;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ 
-  conversationId, 
+const ChatWindow: React.FC<ChatWindowProps> = ({
+  conversationId,
   onConversationUpdate,
   onConversationIdChange,
   chatMode,
@@ -463,22 +463,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       <div className="chat-content">
         {messages.length === 0 && !isLoading ? (
           <div className="welcome-message">
-            <h2>🌟 欢迎来到 AI Chat System 💫</h2>
+            <h2>欢迎来到 Emoji Studio ✨</h2>
             <p>开始对话或上传文件吧~ ✨</p>
             <div className="features">
               <div className="feature feature-chat">
                 <div className="feature-icon-wrapper">
                   <div className="feature-icon">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="url(#gradient1)"/>
-                      <circle cx="8" cy="9" r="1.5" fill="white"/>
-                      <circle cx="12" cy="9" r="1.5" fill="white"/>
-                      <circle cx="16" cy="9" r="1.5" fill="white"/>
-                      <path d="M7 13C7 13 8.5 15 12 15C15.5 15 17 13 17 13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="url(#gradient1)" />
+                      <circle cx="8" cy="9" r="1.5" fill="white" />
+                      <circle cx="12" cy="9" r="1.5" fill="white" />
+                      <circle cx="16" cy="9" r="1.5" fill="white" />
+                      <path d="M7 13C7 13 8.5 15 12 15C15.5 15 17 13 17 13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                       <defs>
                         <linearGradient id="gradient1" x1="2" y1="2" x2="22" y2="22">
-                          <stop offset="0%" stopColor="#ff9a9e"/>
-                          <stop offset="100%" stopColor="#fecfef"/>
+                          <stop offset="0%" stopColor="#ff9a9e" />
+                          <stop offset="100%" stopColor="#fecfef" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -491,13 +491,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <div className="feature-icon-wrapper">
                   <div className="feature-icon">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="url(#gradient2)"/>
-                      <path d="M14 2V8H20" fill="url(#gradient2)" opacity="0.7"/>
-                      <path d="M8 12H16M8 16H13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="url(#gradient2)" />
+                      <path d="M14 2V8H20" fill="url(#gradient2)" opacity="0.7" />
+                      <path d="M8 12H16M8 16H13" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                       <defs>
                         <linearGradient id="gradient2" x1="4" y1="2" x2="20" y2="22">
-                          <stop offset="0%" stopColor="#a8edea"/>
-                          <stop offset="100%" stopColor="#fed6e3"/>
+                          <stop offset="0%" stopColor="#a8edea" />
+                          <stop offset="100%" stopColor="#fed6e3" />
                         </linearGradient>
                       </defs>
                     </svg>
@@ -510,12 +510,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 <div className="feature-icon-wrapper">
                   <div className="feature-icon">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" fill="url(#gradient3)"/>
-                      <path d="M12 6V12L16 14" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" fill="url(#gradient3)" />
+                      <path d="M12 6V12L16 14" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       <defs>
                         <linearGradient id="gradient3" x1="2" y1="2" x2="22" y2="22">
-                          <stop offset="0%" stopColor="#ffecd2"/>
-                          <stop offset="100%" stopColor="#fcb69f"/>
+                          <stop offset="0%" stopColor="#ffecd2" />
+                          <stop offset="100%" stopColor="#fcb69f" />
                         </linearGradient>
                       </defs>
                     </svg>
