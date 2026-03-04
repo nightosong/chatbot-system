@@ -3,7 +3,7 @@ import './ChatWindow.css';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import FileUpload from './FileUpload';
-import { Message, ChatMode, ToolCall } from '../types';
+import { Message, ChatMode, AgentStreamEvent } from '../types';
 import { sendMessage, sendAgentMessage, getConversation } from '../services/api';
 import { modelConfigService } from '../services/modelConfig';
 import { languageConfigService } from '../services/languageConfig';
@@ -16,6 +16,28 @@ interface ChatWindowProps {
   chatMode: ChatMode;
 }
 
+interface AgentStep {
+  id: number;
+  type: 'status' | 'thinking' | 'tool_call' | 'tool_result' | 'error';
+  title: string;
+  detail?: string;
+  timestamp: string;
+}
+
+interface AgentRun {
+  id: number;
+  status: 'running' | 'completed' | 'error';
+  steps: AgentStep[];
+  startedAt: string;
+  finishedAt?: string;
+}
+
+interface MediaPreviewItem {
+  url: string;
+  type: 'image' | 'video';
+  coverUrl?: string;
+}
+
 const ChatWindow: React.FC<ChatWindowProps> = ({ 
   conversationId, 
   onConversationUpdate,
@@ -26,9 +48,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [fileContext, setFileContext] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
+  const [activeRunId, setActiveRunId] = useState<number | null>(null);
+  const [collapsedRuns, setCollapsedRuns] = useState<Record<number, boolean>>({});
   const [streamingContent, setStreamingContent] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const stepIdRef = useRef<number>(0);
+  const runIdRef = useRef<number>(0);
 
   // Load conversation when conversationId changes
   useEffect(() => {
@@ -38,13 +64,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       setMessages([]);
       setFileContext(null);
       setFileName(null);
+      setAgentRuns([]);
+      setActiveRunId(null);
+      setCollapsedRuns({});
     }
   }, [conversationId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, streamingContent, agentRuns]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -150,13 +179,128 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   ) => {
     // Reset streaming state
     setStreamingContent('');
-    setToolCalls([]);
 
     // Get agent config
     const agentConfig = agentConfigService.getAgentConfig();
 
     let fullContent = '';
-    const currentToolCalls: ToolCall[] = [];
+    const runId = ++runIdRef.current;
+    setActiveRunId(runId);
+    setCollapsedRuns((prev) => ({ ...prev, [runId]: false }));
+    setAgentRuns((prev) => [
+      ...prev,
+      {
+        id: runId,
+        status: 'running',
+        steps: [],
+        startedAt: new Date().toISOString(),
+      },
+    ]);
+
+    const appendStep = (targetRunId: number, step: Omit<AgentStep, 'id' | 'timestamp'>) => {
+      const nextStep: AgentStep = {
+        ...step,
+        id: ++stepIdRef.current,
+        timestamp: new Date().toISOString(),
+      };
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === targetRunId ? { ...run, steps: [...run.steps, nextStep] } : run
+        )
+      );
+    };
+
+    const updateRunStatus = (targetRunId: number, status: AgentRun['status']) => {
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id === targetRunId
+            ? { ...run, status, finishedAt: new Date().toISOString() }
+            : run
+        )
+      );
+    };
+
+    const addStep = (step: Omit<AgentStep, 'id' | 'timestamp'>) => {
+      appendStep(runId, step);
+    };
+
+    const normalizeDetail = (value: unknown): string => {
+      if (value === undefined || value === null) return '';
+      if (typeof value === 'string') return value;
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const handleAgentEvent = (event: AgentStreamEvent) => {
+      if (event.type === 'text') {
+        fullContent += event.content || '';
+        setStreamingContent(fullContent);
+        return;
+      }
+
+      if (event.type === 'thinking') {
+        addStep({
+          type: 'thinking',
+          title: '思考中',
+          detail: event.content || '',
+        });
+        return;
+      }
+
+      if (event.type === 'tool_call') {
+        addStep({
+          type: 'tool_call',
+          title: `调用工具: ${event.tool || 'unknown'}`,
+          detail: normalizeDetail(event.args || {}),
+        });
+        return;
+      }
+
+      if (event.type === 'tool_result') {
+        addStep({
+          type: 'tool_result',
+          title: `工具返回: ${event.tool || 'unknown'}`,
+          detail: normalizeDetail(event.result || ''),
+        });
+        return;
+      }
+
+      if (event.type === 'metadata') {
+        // Update conversation ID if this is a new conversation
+        if (!conversationId && event.conversation_id && onConversationIdChange) {
+          onConversationIdChange(event.conversation_id);
+        }
+        addStep({
+          type: 'status',
+          title: '执行完成',
+          detail: `工具调用次数: ${event.tool_calls_count ?? 0}`,
+        });
+        updateRunStatus(runId, 'completed');
+        // Update conversation list
+        onConversationUpdate();
+        return;
+      }
+
+      if (event.type === 'error') {
+        fullContent += `\n\n❌ Error: ${event.content}`;
+        setStreamingContent(fullContent);
+        addStep({
+          type: 'error',
+          title: '执行异常',
+          detail: event.content || 'Unknown error',
+        });
+        updateRunStatus(runId, 'error');
+      }
+    };
+
+    addStep({
+      type: 'status',
+      title: 'Agent 开始执行',
+      detail: '正在分析请求并准备调用工具',
+    });
 
     await sendAgentMessage(
       {
@@ -167,36 +311,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         language: language,
         agent_config: agentConfig,
       },
-      (event) => {
-        if (event.type === 'text') {
-          fullContent += event.content || '';
-          setStreamingContent(fullContent);
-        } else if (event.type === 'tool_call') {
-          const toolCall: ToolCall = {
-            tool: event.tool || '',
-            args: event.args || {},
-          };
-          currentToolCalls.push(toolCall);
-          setToolCalls([...currentToolCalls]);
-        } else if (event.type === 'tool_result') {
-          // Update the last tool call with result
-          if (currentToolCalls.length > 0) {
-            const lastTool = currentToolCalls[currentToolCalls.length - 1];
-            lastTool.result = event.result;
-            setToolCalls([...currentToolCalls]);
-          }
-        } else if (event.type === 'metadata') {
-          // Update conversation ID if this is a new conversation
-          if (!conversationId && event.conversation_id && onConversationIdChange) {
-            onConversationIdChange(event.conversation_id);
-          }
-          // Update conversation list
-          onConversationUpdate();
-        } else if (event.type === 'error') {
-          fullContent += `\n\n❌ Error: ${event.content}`;
-          setStreamingContent(fullContent);
-        }
-      }
+      handleAgentEvent
+    );
+
+    setAgentRuns((prev) =>
+      prev.map((run) =>
+        run.id === runId && run.status === 'running'
+          ? { ...run, status: 'completed', finishedAt: new Date().toISOString() }
+          : run
+      )
     );
 
     // Add final assistant message
@@ -209,7 +332,108 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
     // Clear streaming state
     setStreamingContent('');
-    setToolCalls([]);
+    setActiveRunId(null);
+  };
+
+  const toggleRunCollapsed = (runId: number) => {
+    setCollapsedRuns((prev) => ({
+      ...prev,
+      [runId]: !prev[runId],
+    }));
+  };
+
+  const tryParseJson = (raw?: string): unknown => {
+    if (!raw) return null;
+    try {
+      const first = JSON.parse(raw);
+      if (typeof first === 'string') {
+        try {
+          return JSON.parse(first);
+        } catch {
+          return first;
+        }
+      }
+      return first;
+    } catch {
+      return null;
+    }
+  };
+
+  const extractMediaPreviewItems = (raw?: string): MediaPreviewItem[] => {
+    const parsed = tryParseJson(raw);
+    if (!parsed || typeof parsed !== 'object') return [];
+
+    const result: MediaPreviewItem[] = [];
+    const obj = parsed as Record<string, unknown>;
+    const data = obj.data as Record<string, unknown> | undefined;
+    const list = Array.isArray(data?.list) ? (data?.list as Array<Record<string, unknown>>) : [];
+
+    for (const item of list) {
+      const url = typeof item.url === 'string' ? item.url : '';
+      if (!url) continue;
+
+      const subtype = typeof item.subtype === 'string' ? item.subtype.toLowerCase() : '';
+      const coverUrl = typeof item.cover_img === 'string' ? item.cover_img : undefined;
+      const urlLower = url.toLowerCase();
+
+      const isVideoBySubtype = subtype === 'video' || subtype === 'avatar';
+      const isVideoByExt = ['.mp4', '.mov', '.webm', '.m4v', '.avi', '.mkv'].some((ext) =>
+        urlLower.includes(ext)
+      );
+      const mediaType: 'image' | 'video' = isVideoBySubtype || isVideoByExt ? 'video' : 'image';
+
+      result.push({
+        url,
+        type: mediaType,
+        coverUrl,
+      });
+    }
+
+    return result;
+  };
+
+  const renderStepDetail = (step: AgentStep) => {
+    const mediaItems = step.type === 'tool_result' ? extractMediaPreviewItems(step.detail) : [];
+    const hasMedia = mediaItems.length > 0;
+
+    return (
+      <>
+        {hasMedia && (
+          <div className="agent-media-grid">
+            {mediaItems.map((item, index) => (
+              <a
+                key={`${item.url}-${index}`}
+                className="agent-media-card"
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                title={item.url}
+              >
+                {item.type === 'video' ? (
+                  <video
+                    className="agent-media"
+                    src={item.url}
+                    poster={item.coverUrl}
+                    muted
+                    controls
+                    preload="metadata"
+                  />
+                ) : (
+                  <img className="agent-media" src={item.url} alt="generated media" loading="lazy" />
+                )}
+                <span className="agent-media-type">{item.type === 'video' ? 'VIDEO' : 'IMAGE'}</span>
+              </a>
+            ))}
+          </div>
+        )}
+        {step.detail && (
+          <details className="agent-step-raw">
+            <summary>查看原始结果</summary>
+            <pre className="agent-step-detail">{step.detail}</pre>
+          </details>
+        )}
+      </>
+    );
   };
 
   const handleFileUpload = (content: string, filename: string) => {
@@ -220,6 +444,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const handleRemoveFile = () => {
     setFileContext(null);
     setFileName(null);
+  };
+
+  const formatStepTime = (isoTime: string): string => {
+    try {
+      return new Date(isoTime).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return '';
+    }
   };
 
   return (
@@ -292,9 +528,76 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         ) : (
           <>
-            <MessageList messages={messages} isLoading={isLoading} />
+            <MessageList messages={messages} isLoading={isLoading && chatMode !== 'agent'} />
+            {chatMode === 'agent' && agentRuns.length > 0 && (
+              <div className="agent-runs-list">
+                {[...agentRuns].reverse().map((run) => (
+                  <div key={run.id} className="agent-live-panel">
+                    <button
+                      type="button"
+                      className="agent-live-header"
+                      onClick={() => toggleRunCollapsed(run.id)}
+                      aria-expanded={!collapsedRuns[run.id]}
+                    >
+                      <span className={`agent-live-chevron ${collapsedRuns[run.id] ? 'collapsed' : ''}`}>
+                        ▾
+                      </span>
+                      <span className="agent-live-title">
+                        Agent 执行过程 #{run.id}
+                      </span>
+                      <span className={`agent-live-status agent-live-status-${run.status}`}>
+                        {run.status === 'running' ? '执行中' : run.status === 'completed' ? '已完成' : '异常'}
+                      </span>
+                      <span className="agent-live-count">{run.steps.length} steps</span>
+                    </button>
+                    {!collapsedRuns[run.id] && (
+                      <div className="agent-live-steps">
+                        {run.steps.map((step, index) => {
+                          const isLast = index === run.steps.length - 1;
+                          const isRunningStep =
+                            run.status === 'running' &&
+                            run.id === activeRunId &&
+                            isLast;
+
+                          return (
+                            <div
+                              key={step.id}
+                              className={`agent-timeline-step ${isRunningStep ? 'is-running' : ''}`}
+                            >
+                              <div className="agent-step-rail">
+                                <span className={`agent-step-dot step-dot-${step.type} ${isRunningStep ? 'dot-running' : ''}`}></span>
+                                {!isLast && <span className="agent-step-line"></span>}
+                              </div>
+                              <div className={`agent-step agent-step-${step.type}`}>
+                                <div className="agent-step-title-row">
+                                  <div className="agent-step-title">{step.title}</div>
+                                  <div className="agent-step-meta">
+                                    {isRunningStep && (
+                                      <span className="agent-step-running">
+                                        <span className="run-dot"></span>
+                                        <span className="run-dot"></span>
+                                        <span className="run-dot"></span>
+                                      </span>
+                                    )}
+                                    <span className="agent-step-time">{formatStepTime(step.timestamp)}</span>
+                                  </div>
+                                </div>
+                                {renderStepDetail(step)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {activeRunId && (
+                  <div className="agent-live-hint">正在持续更新执行中间信息…</div>
+                )}
+              </div>
+            )}
             {streamingContent && (
-              <div className="streaming-message">
+              <div className="streaming-message agent-draft-message">
                 <div className="message assistant">
                   <div className="message-content">{streamingContent}</div>
                   <div className="streaming-indicator">
@@ -303,27 +606,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     <span className="dot"></span>
                   </div>
                 </div>
-              </div>
-            )}
-            {toolCalls.length > 0 && (
-              <div className="tool-calls-container">
-                {toolCalls.map((toolCall, index) => (
-                  <div key={index} className="tool-call">
-                    <div className="tool-call-header">
-                      <span className="tool-icon">🔧</span>
-                      <span className="tool-name">{toolCall.tool}</span>
-                    </div>
-                    <div className="tool-call-args">
-                      {JSON.stringify(toolCall.args, null, 2)}
-                    </div>
-                    {toolCall.result && (
-                      <div className="tool-call-result">
-                        <span className="result-label">Result:</span>
-                        <pre>{toolCall.result}</pre>
-                      </div>
-                    )}
-                  </div>
-                ))}
               </div>
             )}
           </>
