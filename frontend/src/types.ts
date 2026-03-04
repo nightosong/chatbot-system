@@ -51,7 +51,7 @@ export interface PlatformOption {
   icon: string;
 }
 
-export type ChatMode = 'chat' | 'agent';
+export type ChatMode = 'chat' | 'agent' | 'code';
 
 export interface MCPServerConfig {
   url: string;
@@ -110,4 +110,40 @@ export interface ToolCall {
   tool: string;
   args: any;
   result?: string;
+}
+
+// Code Mode types
+export interface CodeRequest {
+  message: string;
+  conversation_id?: string | null;
+  history?: Message[];
+  llm_config?: {
+    provider: string;
+    api_key: string;
+    model_name: string;
+    base_url?: string;
+  } | null;
+  language?: string | null;
+  workspace_root?: string | null;
+  max_iterations?: number;
+}
+
+export interface CodeStreamEvent {
+  type: 'text' | 'tool_call' | 'tool_result' | 'tool_progress' | 'permission_required' | 'error' | 'done' | 'metadata';
+  content?: string;
+  tool?: string;
+  args?: any;
+  result?: any;
+  message?: string;      // Progress message
+  percentage?: number;   // Progress percentage (0-100)
+  conversation_id?: string;
+  action?: string;
+  target?: string;
+}
+
+export interface CodeToolCall {
+  tool: string;
+  args: any;
+  result?: any;
+  progress?: string[];  // Progress messages list
 }

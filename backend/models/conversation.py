@@ -61,3 +61,22 @@ class AgentRequest(BaseModel):
     llm_config: Optional[ModelConfig] = None
     language: Optional[str] = None
     agent_config: Optional[AgentConfig] = None
+
+
+class CodeRequest(BaseModel):
+    """Request model for code mode endpoint"""
+    message: str
+    conversation_id: Optional[str] = None
+    history: Optional[List[dict]] = None  # Full conversation history
+    llm_config: Optional[ModelConfig] = None
+    language: Optional[str] = None
+    workspace_root: Optional[str] = None  # Workspace directory (defaults to cwd)
+    max_iterations: int = 20
+
+
+class PermissionRule(BaseModel):
+    """Permission rule model"""
+    tool: str  # Tool name (read, write, edit, bash, etc.)
+    pattern: str  # Pattern to match (supports wildcards)
+    action: str  # Action to take: allow, deny, ask
+

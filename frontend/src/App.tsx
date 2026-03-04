@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import ChatWindow from './components/ChatWindow';
+import CodeWindow from './components/CodeWindow';
 import ConversationList from './components/ConversationList';
 import UserMenu from './components/UserMenu';
-import CursorEffect from './components/CursorEffect';
 import { Conversation, ChatMode } from './types';
 import { getConversations } from './services/api';
 import { agentConfigService } from './services/agentConfig';
@@ -55,8 +55,6 @@ function App() {
 
   return (
     <div className="App">
-      <CursorEffect />
-
       <header className="App-header">
         <h1>💕 AI 聊天助手 ✨</h1>
         <div className="header-buttons">
@@ -74,6 +72,13 @@ function App() {
               title="Agent 模式 - 支持工具调用"
             >
               Agent
+            </button>
+            <button
+              onClick={() => handleModeChange('code')}
+              className={`mode-btn ${chatMode === 'code' ? 'active' : ''}`}
+              title="Code 模式 - 代码开发助手"
+            >
+              Code
             </button>
           </div>
           <button onClick={handleNewChat} className="new-chat-btn">
@@ -96,13 +101,22 @@ function App() {
           />
         )}
 
-        <ChatWindow
-          key={chatKey}
-          conversationId={currentConversationId}
-          onConversationUpdate={handleConversationUpdate}
-          onConversationIdChange={handleConversationIdChange}
-          chatMode={chatMode}
-        />
+        {chatMode === 'code' ? (
+          <CodeWindow
+            key={chatKey}
+            conversationId={currentConversationId}
+            onConversationUpdate={handleConversationUpdate}
+            onConversationIdChange={handleConversationIdChange}
+          />
+        ) : (
+          <ChatWindow
+            key={chatKey}
+            conversationId={currentConversationId}
+            onConversationUpdate={handleConversationUpdate}
+            onConversationIdChange={handleConversationIdChange}
+            chatMode={chatMode}
+          />
+        )}
       </div>
     </div>
   );

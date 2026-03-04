@@ -1,6 +1,6 @@
 """
 File Service - Handles file upload and processing
-Supports txt, md, and pdf formats
+Supports text documents and media files
 """
 from fastapi import UploadFile
 import PyPDF2
@@ -10,8 +10,14 @@ from typing import Dict, List
 
 class FileService:
     """Service for processing uploaded files"""
-    
-    SUPPORTED_EXTENSIONS = {'.txt', '.md', '.pdf'}
+
+    TEXT_EXTENSIONS = {".txt", ".md", ".pdf"}
+    IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+    VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
+    AUDIO_EXTENSIONS = {".mp3", ".wav", ".aac", ".flac", ".m4a", ".ogg"}
+    SUPPORTED_EXTENSIONS = (
+        TEXT_EXTENSIONS | IMAGE_EXTENSIONS | VIDEO_EXTENSIONS | AUDIO_EXTENSIONS
+    )
     MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
     
     # Token estimation: roughly 1 token ≈ 4 characters for English, 1 token ≈ 2 characters for Chinese
@@ -35,30 +41,60 @@ class FileService:
         Raises:
             ValueError: If file format is not supported or file is too large
         """
+        if not file.filename:
+            raise ValueError("Filename is required")
+
         # Check file extension
-        filename = file.filename.lower()
+        filename = file.filename
         extension = self._get_extension(filename)
-        
+
         if extension not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(
-                f"Unsupported file format. Supported: {', '.join(self.SUPPORTED_EXTENSIONS)}"
+                f"Unsupported file format. Supported: {', '.join(sorted(self.SUPPORTED_EXTENSIONS))}"
             )
-        
+
         # Read file content
         content_bytes = await file.read()
-        
+
         # Check file size
         if len(content_bytes) > self.MAX_FILE_SIZE:
             raise ValueError(
                 f"File too large. Maximum size: {self.MAX_FILE_SIZE / (1024*1024)}MB"
             )
-        
+
         # Process based on file type
-        if extension == '.pdf':
+        if extension in self.IMAGE_EXTENSIONS:
+            return self._process_media(
+                filename=filename,
+                extension=extension,
+                content_type=file.content_type,
+                file_size=len(content_bytes),
+                media_type="image",
+            )
+
+        if extension in self.VIDEO_EXTENSIONS:
+            return self._process_media(
+                filename=filename,
+                extension=extension,
+                content_type=file.content_type,
+                file_size=len(content_bytes),
+                media_type="video",
+            )
+
+        if extension in self.AUDIO_EXTENSIONS:
+            return self._process_media(
+                filename=filename,
+                extension=extension,
+                content_type=file.content_type,
+                file_size=len(content_bytes),
+                media_type="audio",
+            )
+
+        if extension == ".pdf":
             text_content = self._process_pdf(content_bytes)
         else:  # .txt or .md
             text_content = self._process_text(content_bytes)
-        
+
         # Apply intelligent processing based on content length
         return self._apply_intelligent_processing(text_content, filename)
     
@@ -100,6 +136,35 @@ class FileService:
             return "\n\n".join(text_parts)
         except Exception as e:
             raise ValueError(f"Error processing PDF: {str(e)}")
+
+    def _process_media(
+        self,
+        filename: str,
+        extension: str,
+        content_type: str | None,
+        file_size: int,
+        media_type: str,
+    ) -> Dict[str, any]:
+        """
+        Process media file by generating metadata context.
+        """
+        content = (
+            f"[Uploaded {media_type} file]\n"
+            f"filename: {filename}\n"
+            f"type: {media_type}\n"
+            f"extension: {extension}\n"
+            f"mime_type: {content_type or 'unknown'}\n"
+            f"size_bytes: {file_size}\n\n"
+            "Note: This system currently stores media metadata only. "
+            "If analysis of media content is required, please use an external media analysis tool."
+        )
+        return {
+            "content": content,
+            "original_length": len(content),
+            "is_summarized": False,
+            "processing_strategy": "media_metadata",
+            "filename": filename,
+        }
     
     def _apply_intelligent_processing(self, text: str, filename: str) -> Dict[str, any]:
         """

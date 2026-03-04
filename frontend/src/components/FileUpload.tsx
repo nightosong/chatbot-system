@@ -17,11 +17,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
     if (!file) return;
 
     // Validate file type
-    const validExtensions = ['.txt', '.md', '.pdf'];
+    const validExtensions = [
+      '.txt', '.md', '.pdf',
+      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
+      '.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v',
+      '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg',
+    ];
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
 
     if (!validExtensions.includes(extension)) {
-      setError('不支持的文件类型。请上传 .txt, .md 或 .pdf 文件。');
+      setError('不支持的文件类型。请上传文档、图片、视频或音频文件。');
       return;
     }
 
@@ -71,7 +76,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.pdf"
+        accept=".txt,.md,.pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.mov,.avi,.mkv,.webm,.m4v,.mp3,.wav,.aac,.flac,.m4a,.ogg"
         onChange={handleFileSelect}
         style={{ display: 'none' }}
       />

@@ -1,3 +1,20 @@
+.App,
+body,
+html {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff72b0' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round' d='M4 3L4 24L10.2 18.6L14.5 28L17.2 26.7L12.9 17.4L21 17.4L4 3Z'/%3E%3C/svg%3E") 4 3, auto;
+}
+
+button,
+a,
+[role="button"] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
 .App {
   height: 100%;
   display: flex;

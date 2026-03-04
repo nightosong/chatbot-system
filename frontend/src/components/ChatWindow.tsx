@@ -268,7 +268,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   </div>
                 </div>
                 <span className="feature-title">文件上传</span>
-                <span className="feature-desc">支持 txt, md, pdf</span>
+                <span className="feature-desc">支持文档/图片/视频/音频</span>
               </div>
               <div className="feature feature-history">
                 <div className="feature-icon-wrapper">

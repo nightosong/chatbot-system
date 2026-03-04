@@ -43,7 +43,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
     }
 
     const platformOption = PLATFORM_OPTIONS.find(p => p.value === newModel.platform);
-    
+
     const addedModel = modelConfigService.add({
       platform: newModel.platform!,
       apiKey: newModel.apiKey!,
@@ -66,7 +66,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
   const handleDeleteModel = (id: string) => {
     const model = models.find(m => m.id === id);
     if (!model) return;
-    
+
     // 如果要删除的是默认模型，提示用户
     if (model.isDefault) {
       if (!window.confirm('⚠️ 这是当前默认模型，删除后需要重新选择默认模型。确定要删除吗？')) {
@@ -77,16 +77,16 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
         return;
       }
     }
-    
+
     modelConfigService.delete(id);
     const newModels = models.filter(m => m.id !== id);
-    
+
     // 如果删除的是默认模型，且还有其他模型，自动选择第一个作为默认
     if (model.isDefault && newModels.length > 0) {
       modelConfigService.setDefault(newModels[0].id);
       newModels[0].isDefault = true;
     }
-    
+
     setModels(newModels);
   };
 
@@ -126,7 +126,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
               <span className="guidance-text">点击 <span className="guidance-check">✓</span> 按钮选择默认模型，只能选择一个。</span>
             </div>
           )}
-          
+
           {/* Existing Models List - 添加新模型时隐藏 */}
           {!isAddingNew && (
             <div className="models-list">
@@ -138,8 +138,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
                 </div>
               ) : (
                 models.map((model) => (
-                  <div 
-                    key={model.id} 
+                  <div
+                    key={model.id}
                     className={`model-card ${model.isDefault ? 'active-default' : 'inactive'}`}
                     data-platform={model.platform}
                   >
@@ -168,7 +168,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
                             {model.isDefault ? '默认' : '选择'}
                           </span>
                         </div>
-                        
+
                         {/* 删除 */}
                         <button
                           className="delete-button"
@@ -190,7 +190,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
           {isAddingNew && (
             <div className="add-model-form">
               <h3>✨ 添加新模型</h3>
-              
+
               <div className="form-group">
                 <label>平台类型</label>
                 <select

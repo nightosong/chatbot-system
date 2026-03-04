@@ -71,6 +71,8 @@ def test_get_extension(file_service):
     assert file_service._get_extension("test.txt") == ".txt"
     assert file_service._get_extension("test.PDF") == ".pdf"
     assert file_service._get_extension("file.name.md") == ".md"
+    assert file_service._get_extension("photo.JPEG") == ".jpeg"
+    assert file_service._get_extension("clip.MP4") == ".mp4"
 
 
 def test_get_extension_no_extension(file_service):
@@ -149,3 +151,33 @@ def test_smart_summary(file_service):
     assert "Beginning Section" in summary
     assert "Middle Section" in summary
     assert "End Section" in summary
+
+
+@pytest.mark.asyncio
+async def test_process_image_file(file_service):
+    """Test processing image file as media metadata"""
+    image_bytes = b"\x89PNG\r\n\x1a\nfakepngdata"
+    upload_file = UploadFile(
+        filename="test.png", file=io.BytesIO(image_bytes), headers={"content-type": "image/png"}
+    )
+
+    result = await file_service.process_file(upload_file)
+    assert result["is_summarized"] is False
+    assert result["processing_strategy"] == "media_metadata"
+    assert "[Uploaded image file]" in result["content"]
+    assert "filename: test.png" in result["content"]
+
+
+@pytest.mark.asyncio
+async def test_process_audio_file(file_service):
+    """Test processing audio file as media metadata"""
+    audio_bytes = b"ID3fake_mp3_data"
+    upload_file = UploadFile(
+        filename="test.mp3", file=io.BytesIO(audio_bytes), headers={"content-type": "audio/mpeg"}
+    )
+
+    result = await file_service.process_file(upload_file)
+    assert result["is_summarized"] is False
+    assert result["processing_strategy"] == "media_metadata"
+    assert "[Uploaded audio file]" in result["content"]
+    assert "filename: test.mp3" in result["content"]

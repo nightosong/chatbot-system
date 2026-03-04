@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import json
+import os
 from fastapi.responses import StreamingResponse  # type: ignore
 from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
@@ -19,6 +20,7 @@ from services.llm_service import LLMService
 from services.file_service import FileService
 from services.conversation_service import ConversationService
 from services.agent_service import AgentService
+from services.code_service import CodeService
 from services.mcp_client import MCPClient, BuiltinMCPTools
 from services.skill_manager import SkillManager
 from models.conversation import (
@@ -27,6 +29,7 @@ from models.conversation import (
     ConversationHistory,
     AgentRequest,
     AgentConfig,
+    CodeRequest,
 )
 
 app = FastAPI(title="AI Chat System", version="1.0.0")
@@ -47,8 +50,11 @@ conversation_service = ConversationService()
 
 # Initialize agent services
 mcp_client = MCPClient()  # Will be configured per request
-skill_manager = SkillManager()
+skill_manager = SkillManager(workspace_root=os.getcwd())
 agent_service = AgentService(mcp_client=mcp_client, skill_manager=skill_manager)
+
+# Initialize code service
+code_service = CodeService(llm_service=llm_service)
 
 
 @app.get("/")
@@ -109,7 +115,7 @@ async def chat(request: ChatRequest):
 async def upload_file(file: UploadFile = File(...)):
     """
     Upload and process file with intelligent handling
-    Supports txt, md, and pdf formats
+    Supports text, image, video, and audio formats
 
     Returns:
         - content: Processed text (may be summarized for large files)
@@ -317,6 +323,83 @@ async def configure_agent(config: AgentConfig):
         return {
             "status": "configured",
             "config": config.model_dump(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/code/chat")
+async def code_chat(request: CodeRequest):
+    """
+    Code mode chat endpoint with streaming and tool calling
+    Provides file operations, bash execution, and code intelligence
+
+    Returns Server-Sent Events (SSE) stream with:
+    - text chunks
+    - tool calls (read, write, edit, bash, glob, grep)
+    - tool results
+    - permission requests
+    """
+
+    async def event_generator():
+        """Generate SSE events"""
+        try:
+            # Set workspace root (default to current directory or from request)
+            workspace_root = request.workspace_root or os.getcwd()
+
+            # Initialize code service for this request
+            request_code_service = CodeService(
+                workspace_root=workspace_root, llm_service=llm_service
+            )
+
+            # Generate streaming response with tool calling
+            async for chunk in request_code_service.generate_code_stream(
+                message=request.message,
+                conversation_history=request.history or [],
+                model_config=(
+                    request.llm_config.model_dump() if request.llm_config else None
+                ),
+                language=request.language,
+                max_iterations=request.max_iterations,
+            ):
+                # Forward all events to client
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            import traceback
+
+            error_data = {
+                "type": "error",
+                "content": str(e),
+                "traceback": traceback.format_exc(),
+            }
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/code/tools")
+async def get_code_tools():
+    """
+    Get available code mode tools
+    """
+    try:
+        # Get tool definitions from code service
+        temp_code_service = CodeService()
+        tools = temp_code_service._get_code_tools()
+
+        return {
+            "tools": tools,
+            "count": len(tools),
+            "workspace_root": os.getcwd(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

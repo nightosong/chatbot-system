@@ -8,7 +8,6 @@ import asyncio
 import requests
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
-from google import genai  # type: ignore
 
 
 class AgentService:
@@ -24,6 +23,32 @@ class AgentService:
         """
         self.mcp_client = mcp_client
         self.skill_manager = skill_manager
+
+    def _deduplicate_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate tools by function name to avoid model confusion."""
+        deduplicated: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for tool in tools:
+            function_info = tool.get("function", {})
+            name = function_info.get("name")
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            deduplicated.append(tool)
+        return deduplicated
+
+    def _serialize_tool_result(self, result: Any) -> str:
+        """Serialize tool result to JSON string for model and SSE transport."""
+        normalized = result
+        if hasattr(result, "structuredContent"):
+            normalized = result.structuredContent
+        elif hasattr(result, "content"):
+            normalized = result.content
+
+        try:
+            return json.dumps(normalized, ensure_ascii=False, default=str)
+        except Exception:
+            return json.dumps({"result": str(normalized)}, ensure_ascii=False)
 
     async def generate_stream(
         self,
@@ -85,13 +110,19 @@ class AgentService:
             if enable_mcp and active_mcp_client:
                 mcp_tools = await active_mcp_client.list_tools()
                 tools.extend(mcp_tools)
-            # if enable_skills and self.skill_manager:
-            #     skill_tools = self.skill_manager.get_tools()
-            #     tools.extend(skill_tools)
+            if enable_skills and self.skill_manager:
+                skill_tools = self.skill_manager.get_tools()
+                tools.extend(skill_tools)
+
+            tools = self._deduplicate_tools(tools)
 
             # Build messages
             messages = self._build_messages(
-                message, conversation_history, file_context, language
+                message,
+                conversation_history,
+                file_context,
+                language,
+                [tool.get("function", {}).get("name", "") for tool in tools],
             )
 
             # Route to appropriate provider
@@ -138,6 +169,7 @@ class AgentService:
         conversation_history: List[dict],
         file_context: Optional[str],
         language: Optional[str],
+        available_tools: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Build messages for agent mode"""
         messages = []
@@ -159,6 +191,14 @@ Think step by step and explain your reasoning when using tools."""
         if file_context:
             system_content += (
                 f"\n\n[File Content]\n{file_context}\n[End of File Content]"
+            )
+
+        if available_tools:
+            tool_list = ", ".join(sorted([tool for tool in available_tools if tool]))
+            system_content += (
+                "\n\n[Available Tools]\n"
+                f"{tool_list}\n"
+                "Only call tools from this list."
             )
 
         messages.append({"role": "system", "content": system_content})
@@ -297,7 +337,7 @@ Think step by step and explain your reasoning when using tools."""
                     result = await self._execute_tool(
                         tool_name, tool_args, mcp_client_override
                     )
-                    result_str = json.dumps(result, ensure_ascii=False)
+                    result_str = self._serialize_tool_result(result)
                 except Exception as e:
                     result_str = f"Error executing tool: {str(e)}"
 
@@ -424,9 +464,7 @@ Think step by step and explain your reasoning when using tools."""
                         result = await self._execute_tool(
                             tool_name, tool_args, mcp_client_override
                         )
-                        result_str = json.dumps(
-                            result.structuredContent, ensure_ascii=False
-                        )
+                        result_str = self._serialize_tool_result(result)
                     except Exception as e:
                         result_str = f"Error executing tool: {str(e)}"
 
@@ -479,6 +517,14 @@ Think step by step and explain your reasoning when using tools."""
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using Gemini with tool calling"""
         import os
+        try:
+            from google import genai  # type: ignore
+        except ImportError as e:
+            yield {
+                "type": "error",
+                "content": f"Gemini SDK is not installed: {str(e)}",
+            }
+            return
 
         os.environ["GOOGLE_API_KEY"] = api_key
         client = genai.Client()

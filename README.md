@@ -2,7 +2,9 @@
 
 一个功能完整的 AI 对话系统，支持多轮对话、文件上传、对话历史管理，以及**可视化模型配置界面**。
 
-> **🤖 新特性 - Agent 模式**: 现在支持 Agent 模式，具备工具调用、MCP 集成和自定义 Skill 能力！详见 [Agent 模式文档](AGENT_MODE.md)。
+> **💻 新特性 - Code Mode**: 现在支持 Code 模式，提供文件操作、命令执行、代码搜索等开发工具！详见 [Code Mode 文档](OPENCODE_COMPLETE_GUIDE.md) 和 [快速开始](QUICKSTART.md)。
+
+> **🤖 Agent 模式**: 支持 Agent 模式，具备工具调用、MCP 集成和自定义 Skill 能力！详见 [Agent 模式文档](AGENT_MODE.md)。
 
 > **🎉 可视化配置**: 支持通过网页界面直接配置多个 AI 模型，无需修改配置文件！点击右上角头像 → 设置 → 模型配置即可。
 
@@ -10,7 +12,16 @@
 
 ## ✨ 核心功能
 
-### 🤖 **Agent 模式** (NEW!)
+### 💻 **Code Mode** (NEW!)
+- **文件操作**：读取、写入、编辑文件，支持多种编码
+- **命令执行**：在工作区执行 bash 命令，支持超时控制
+- **代码搜索**：使用 glob 和 grep 快速查找文件和内容
+- **权限系统**：细粒度的操作权限控制，保障安全
+- **多 LLM 支持**：支持 Gemini、OpenAI、DeepSeek、Kimi、QWen、Skywork Router 等
+- **实时可视化**：查看工具执行过程和结果
+- **二次元 UI**：与整体风格一致的可爱界面
+
+### 🤖 **Agent 模式**
 - **工具调用**：AI 可以主动调用工具来完成复杂任务
 - **流式输出**：实时查看 AI 的思考过程和工具调用结果
 - **MCP 集成**：支持 Model Context Protocol，连接外部工具服务器
@@ -70,25 +81,29 @@ chatbot-system/
 │   ├── .dockerignore       # 后端 Docker 忽略文件
 │   ├── main.py             # FastAPI 主应用
 │   ├── services/           # 业务逻辑服务
-│   │   ├── llm_service.py      # LLM 集成（支持多提供商）
-│   │   ├── agent_service.py    # Agent 模式核心逻辑
-│   │   ├── mcp_client.py       # MCP 协议客户端
-│   │   ├── skill_manager.py    # 技能管理系统
-│   │   ├── file_service.py     # 文件处理（智能摘要）
-│   │   └── conversation_service.py  # 对话历史管理
+│   │   ├── llm_service.py          # LLM 集成（支持多提供商）
+│   │   ├── agent_service.py        # Agent 模式核心逻辑
+│   │   ├── code_service.py         # Code 模式核心逻辑 (NEW!)
+│   │   ├── permission_service.py   # 权限管理系统 (NEW!)
+│   │   ├── mcp_client.py           # MCP 协议客户端
+│   │   ├── skill_manager.py        # 技能管理系统
+│   │   ├── file_service.py         # 文件处理（智能摘要）
+│   │   └── conversation_service.py # 对话历史管理
 │   ├── models/             # 数据模型（Pydantic）
 │   │   └── conversation.py     # 对话和模型配置模型
 │   ├── tests/              # 后端单元测试
-│   │   ├── conftest.py         # pytest 共享 fixtures
-│   │   ├── test_api.py         # API 端点测试
-│   │   ├── test_llm_service.py # LLM 服务测试
-│   │   ├── test_file_service.py # 文件服务测试
+│   │   ├── conftest.py             # pytest 共享 fixtures
+│   │   ├── test_api.py             # API 端点测试
+│   │   ├── test_agent.py           # Agent 模式测试
+│   │   ├── test_code_tools.py      # Code 工具测试 (NEW!)
+│   │   ├── test_code_api.py        # Code API 测试 (NEW!)
+│   │   ├── test_llm_service.py     # LLM 服务测试
+│   │   ├── test_file_service.py    # 文件服务测试
 │   │   └── test_conversation_service.py # 对话服务测试
 │   ├── data/               # SQLite 数据库（自动创建）
 │   ├── requirements.txt    # Python 依赖
 │   ├── pytest.ini          # pytest 配置
-│   ├── run_tests.sh        # 测试运行脚本
-│   └── test_agent.py       # Agent 模式测试脚本
+│   └── run_tests.sh        # 测试运行脚本
 │
 ├── frontend/               # React 前端
 │   ├── Dockerfile          # 前端 Docker 配置
@@ -97,9 +112,11 @@ chatbot-system/
 │   ├── src/
 │   │   ├── components/     # React 组件
 │   │   │   ├── ChatWindow.tsx         # 聊天窗口
+│   │   │   ├── CodeWindow.tsx         # Code 模式窗口 (NEW!)
 │   │   │   ├── ConversationList.tsx   # 对话历史列表
 │   │   │   ├── UserMenu.tsx           # 用户菜单（头像下拉）
 │   │   │   ├── ModelSettings.tsx      # 模型配置弹框
+│   │   │   ├── AgentSettings.tsx      # Agent 设置弹框
 │   │   │   ├── LanguageSettings.tsx   # 语言设置弹框
 │   │   │   ├── AboutDialog.tsx        # 关于对话框
 │   │   │   ├── PlatformIcon.tsx       # 平台图标组件
@@ -108,6 +125,7 @@ chatbot-system/
 │   │   ├── services/       # API 客户端
 │   │   │   ├── api.ts                 # API 请求封装
 │   │   │   ├── modelConfig.ts         # 模型配置管理（localStorage）
+│   │   │   ├── agentConfig.ts         # Agent 配置管理
 │   │   │   └── languageConfig.ts      # 语言配置管理（localStorage）
 │   │   ├── types.ts        # TypeScript 类型定义
 │   │   ├── App.tsx         # 主应用组件

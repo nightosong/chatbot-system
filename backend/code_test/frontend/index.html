@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋游戏</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 五子棋游戏</h1>
+        
+        <div class="game-info">
+            <div class="status" id="status">请选择游戏模式</div>
+        </div>
+        
+        <div class="mode-selection" id="modeSelection">
+            <h2>选择游戏模式</h2>
+            <div class="mode-buttons">
+                <button class="mode-btn" onclick="startGame('pvp')">
+                    <span class="icon">👥</span>
+                    <span>人人对战</span>
+                </button>
+                <button class="mode-btn" onclick="startGame('pve')">
+                    <span class="icon">🤖</span>
+                    <span>人机对战</span>
+                </button>
+            </div>
+        </div>
+        
+        <div class="game-board-container" id="gameBoardContainer" style="display: none;">
+            <canvas id="gameBoard" width="600" height="600"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" id="restartBtn" onclick="showModeSelection()" style="display: none;">
+                🔄 重新开始
+            </button>
+        </div>
+        
+        <div class="instructions">
+            <h3>📖 游戏说明</h3>
+            <ul>
+                <li>黑棋先行，双方轮流落子</li>
+                <li>率先在横、竖、斜任一方向形成五子连珠者获胜</li>
+                <li>点击棋盘交叉点进行落子</li>
+                <li>最后落子位置会有红点标记</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script src="js/game.js"></script>
+</body>
+</html>
