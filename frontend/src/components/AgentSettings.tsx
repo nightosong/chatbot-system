@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './AgentSettings.css';
 import { agentConfigService } from '../services/agentConfig';
-import { AgentConfig } from '../types';
+import { getAgentSkills, loadAgentSkill } from '../services/api';
+import { AgentConfig, AgentSkill } from '../types';
 
 interface AgentSettingsProps {
   onClose: () => void;
@@ -17,6 +18,19 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [loadedSkills, setLoadedSkills] = useState<AgentSkill[]>([]);
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const result = await getAgentSkills();
+        setLoadedSkills(result.skills);
+      } catch (error) {
+        console.error('Failed to fetch agent skills:', error);
+      }
+    };
+    fetchSkills();
+  }, []);
 
   const handleMcpConfigChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -94,19 +108,23 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
     setMessage(null);
 
     try {
-      // TODO: 实现从 GitHub 加载 Skill 的逻辑
-      // 这里需要后端 API 支持
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟加载
+      const result = await loadAgentSkill(githubUrl.trim(), true);
+      const refreshed = await getAgentSkills();
+      setLoadedSkills(refreshed.skills);
       
       setMessage({ 
         type: 'success', 
-        text: '✓ Skill 加载成功 (功能开发中)' 
+        text: `✓ Skill 加载成功：${result.loaded_count} 个（${result.loaded_skills.join(', ') || '无'}）`,
       });
       setGithubUrl('');
     } catch (error) {
+      const errText =
+        (error as any)?.response?.data?.detail ||
+        (error as Error).message ||
+        '未知错误';
       setMessage({ 
         type: 'error', 
-        text: '❌ 加载失败: ' + (error as Error).message 
+        text: `❌ 加载失败: ${errText}`,
       });
     } finally {
       setIsLoading(false);
@@ -234,6 +252,24 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
                   <span className="example-desc">- 图片处理</span>
                 </li>
               </ul>
+            </div>
+
+            <div className="skill-examples">
+              <p className="examples-title">当前已加载 Skills（{loadedSkills.length}）</p>
+              {loadedSkills.length > 0 ? (
+                <ul className="examples-list">
+                  {loadedSkills.map((skill) => (
+                    <li key={skill.name}>
+                      <code>{skill.name}</code>
+                      <span className="example-desc">
+                        {` - ${skill.source === 'builtin' ? '内置' : '动态'}: ${skill.description}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="setting-description">暂无可用 Skill</p>
+              )}
             </div>
           </section>
 

@@ -1,0 +1,51 @@
+2026-03-04 17:37:18,474 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:37:21,249 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=0.92
+2026-03-04 17:37:24,262 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=4.19
+2026-03-04 17:37:24,791 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=97.06
+2026-03-04 17:37:24,799 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=3.57
+2026-03-04 17:37:31,343 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=2.35
+2026-03-04 17:37:31,346 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=0.72
+2026-03-04 17:37:34,344 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=0.87
+2026-03-04 17:37:37,343 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=0.53
+2026-03-04 17:37:40,343 | INFO     | ai_chat.backend | HTTP GET /api/logs status=200 ip=127.0.0.1 duration_ms=0.92
+2026-03-04 17:39:29,781 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:42:15,102 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:42:20,709 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=16.63
+2026-03-04 17:42:20,717 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=2.68
+2026-03-04 17:43:08,613 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:47:54,111 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:48:53,435 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:49:45,002 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:51:17,117 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:51:22,020 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=12.40
+2026-03-04 17:51:22,028 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=2.31
+2026-03-04 17:51:55,526 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.51
+2026-03-04 17:51:55,528 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.36
+2026-03-04 17:52:17,420 | INFO     | ai_chat.backend | HTTP OPTIONS /api/agent/skills/load status=200 ip=127.0.0.1 duration_ms=0.33
+2026-03-04 17:52:17,426 | WARNING  | ai_chat.backend | Load skill validation failed: source=git@github.com:op7418/NanoBanana-PPT-Skills.git, error=Skill source path does not exist: /Users/songguodong/Workspace/Skywork/chatbot-system/backend/git@github.com:op7418/NanoBanana-PPT-Skills.git
+2026-03-04 17:52:17,427 | INFO     | ai_chat.backend | HTTP POST /api/agent/skills/load status=400 ip=127.0.0.1 duration_ms=3.65
+2026-03-04 17:58:09,225 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 17:58:09,284 | WARNING  | ai_chat.backend | Skip local skill auto-load: No skill python files found. Expected files under 'skills/' or repository root.
+2026-03-04 17:58:15,241 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=7.10
+2026-03-04 17:58:15,249 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=4.49
+2026-03-04 17:58:17,970 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.02
+2026-03-04 17:58:17,973 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.51
+2026-03-04 17:58:29,229 | WARNING  | ai_chat.backend | Load skill validation failed: source=git@github.com:op7418/NanoBanana-PPT-Skills.git, error=Skill source path does not exist: /Users/songguodong/Workspace/Skywork/chatbot-system/backend/git@github.com:op7418/NanoBanana-PPT-Skills.git
+2026-03-04 17:58:29,230 | INFO     | ai_chat.backend | HTTP POST /api/agent/skills/load status=400 ip=127.0.0.1 duration_ms=3.77
+2026-03-04 18:01:52,061 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 18:01:52,098 | WARNING  | ai_chat.backend | Skip local skill auto-load: No skill python files found. Expected files under 'skills/' or repository root.
+2026-03-04 18:01:58,081 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=7.55
+2026-03-04 18:01:58,087 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=3.03
+2026-03-04 18:02:03,071 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.94
+2026-03-04 18:02:03,073 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.21
+2026-03-04 18:02:10,531 | WARNING  | ai_chat.backend | Load skill validation failed: source=git@github.com:op7418/NanoBanana-PPT-Skills.git, error=Failed to load skills: /Users/songguodong/Workspace/Skywork/chatbot-system/backend/skills/NanoBanana-PPT-Skills/generate_ppt_video.py: No module named 'video_composer'; /Users/songguodong/Workspace/Skywork/chatbot-system/backend/skills/NanoBanana-PPT-Skills/transition_prompt_generator.py: No module named 'anthropic'; /Users/songguodong/Workspace/Skywork/chatbot-system/backend/skills/NanoBanana-PPT-Skills/video_materials.py: No module named 'kling_api'
+2026-03-04 18:02:10,532 | INFO     | ai_chat.backend | HTTP POST /api/agent/skills/load status=400 ip=127.0.0.1 duration_ms=3068.55
+2026-03-04 18:18:56,143 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-04 18:18:56,179 | WARNING  | ai_chat.backend | Skip local skill auto-load: No valid skill found. A skill directory must contain SKILL.md
+2026-03-04 18:19:02,165 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=17.18
+2026-03-04 18:19:02,178 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=9.45
+2026-03-04 18:19:06,885 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.45
+2026-03-04 18:19:06,887 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.34
+2026-03-04 18:19:12,922 | INFO     | ai_chat.backend | HTTP OPTIONS /api/agent/skills/load status=200 ip=127.0.0.1 duration_ms=0.65
+2026-03-04 18:19:14,699 | INFO     | ai_chat.backend | HTTP POST /api/agent/skills/load status=200 ip=127.0.0.1 duration_ms=1774.53
+2026-03-04 18:19:14,702 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.32

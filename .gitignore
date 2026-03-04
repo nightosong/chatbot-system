@@ -45,3 +45,6 @@ htmlcov/
 
 # Data
 /backend/data/*.db
+
+# Skills
+/backend/skills/*

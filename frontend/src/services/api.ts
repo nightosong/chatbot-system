@@ -6,6 +6,9 @@ import {
   ConversationDetail,
   AgentRequest,
   AgentStreamEvent,
+  AgentSkill,
+  BackendLogsResponse,
+  SkillLoadResponse,
   CodeRequest,
   CodeStreamEvent,
 } from '../types';
@@ -88,6 +91,37 @@ export const sendAgentMessage = async (
   } finally {
     reader.releaseLock();
   }
+};
+
+export const loadAgentSkill = async (
+  source: string,
+  forceUpdate: boolean = false
+): Promise<SkillLoadResponse> => {
+  const response = await api.post<SkillLoadResponse>('/api/agent/skills/load', {
+    source,
+    force_update: forceUpdate,
+  });
+  return response.data;
+};
+
+export const getAgentSkills = async (): Promise<{ skills: AgentSkill[]; count: number }> => {
+  const response = await api.get<{ skills: AgentSkill[]; count: number }>('/api/agent/skills');
+  return response.data;
+};
+
+export const getBackendLogs = async (
+  lines: number = 200,
+  level?: string,
+  contains?: string
+): Promise<BackendLogsResponse> => {
+  const response = await api.get<BackendLogsResponse>('/api/logs', {
+    params: {
+      lines,
+      level: level || undefined,
+      contains: contains || undefined,
+    },
+  });
+  return response.data;
 };
 
 export interface FileUploadResponse {

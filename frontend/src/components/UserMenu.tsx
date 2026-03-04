@@ -4,6 +4,7 @@ import ModelSettings from './ModelSettings';
 import LanguageSettings from './LanguageSettings';
 import AgentSettings from './AgentSettings';
 import AboutDialog from './AboutDialog';
+import LogViewer from './LogViewer';
 
 const UserMenu: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -11,6 +12,7 @@ const UserMenu: React.FC = () => {
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isAgentSettingsOpen, setIsAgentSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -54,6 +56,11 @@ const UserMenu: React.FC = () => {
     setIsAboutOpen(true);
   };
 
+  const handleLogViewerClick = () => {
+    setIsMenuOpen(false);
+    setIsLogViewerOpen(true);
+  };
+
   return (
     <>
       <div className="user-menu-container" ref={menuRef}>
@@ -87,6 +94,10 @@ const UserMenu: React.FC = () => {
               <span className="menu-icon">🤖</span>
               <span className="menu-text">Agent 设置</span>
             </div>
+            <div className="menu-item" onClick={handleLogViewerClick}>
+              <span className="menu-icon">📜</span>
+              <span className="menu-text">日志浏览</span>
+            </div>
             <div className="menu-divider"></div>
             <div className="menu-item" onClick={handleAboutClick}>
               <span className="menu-icon">ℹ️</span>
@@ -110,6 +121,10 @@ const UserMenu: React.FC = () => {
 
       {isAboutOpen && (
         <AboutDialog onClose={() => setIsAboutOpen(false)} />
+      )}
+
+      {isLogViewerOpen && (
+        <LogViewer onClose={() => setIsLogViewerOpen(false)} />
       )}
     </>
   );

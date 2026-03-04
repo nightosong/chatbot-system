@@ -1,13 +1,12 @@
-fastapi==0.128.2
-fastmcp==2.14.1
-uvicorn[standard]
+fastapi==0.135.0
+fastmcp==3.1.0
 # pydantic==2.8.2
-python-multipart==0.0.20
+python-multipart==0.0.22
 # python-dotenv==1.0.1
-google-genai>=0.2.0  # 新版 Google GenAI SDK
-openai==1.59.7
+google-genai==1.65.0
+openai==2.24.0
 PyPDF2==3.0.1
-pytest==8.3.4
-pytest-asyncio==0.24.0
-pytest-cov==6.0.0
+pytest==9.0.2
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
 httpx==0.28.1

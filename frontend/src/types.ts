@@ -82,6 +82,27 @@ export interface AgentConfig {
   max_iterations: number;
 }
 
+export interface SkillLoadResponse {
+  source: string;
+  resolved_path: string;
+  loaded_skills: string[];
+  loaded_count: number;
+  errors: string[];
+}
+
+export interface AgentSkill {
+  name: string;
+  description: string;
+  source: string;
+  metadata?: Record<string, any>;
+}
+
+export interface BackendLogsResponse {
+  log_file: string;
+  total: number;
+  lines: string[];
+}
+
 export interface AgentRequest {
   message: string;
   conversation_id?: string | null;

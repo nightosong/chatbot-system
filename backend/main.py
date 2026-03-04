@@ -7,14 +7,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import warnings
 import json
 import os
+import time
+import logging
 from fastapi.responses import StreamingResponse  # type: ignore
 from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uvicorn
+from starlette.requests import Request  # type: ignore
+from starlette.responses import Response  # type: ignore
 
 from services.llm_service import LLMService
 from services.file_service import FileService
@@ -23,6 +28,7 @@ from services.agent_service import AgentService
 from services.code_service import CodeService
 from services.mcp_client import MCPClient, BuiltinMCPTools
 from services.skill_manager import SkillManager
+from services.logging_service import setup_logging, tail_log_file
 from models.conversation import (
     ChatRequest,
     ChatResponse,
@@ -32,7 +38,21 @@ from models.conversation import (
     CodeRequest,
 )
 
+warnings.filterwarnings(
+    "ignore",
+    message=r"Please use `import python_multipart` instead\.",
+    category=PendingDeprecationWarning,
+)
+
 app = FastAPI(title="AI Chat System", version="1.0.0")
+
+LOG_DIR = os.getenv(
+    "APP_LOG_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"),
+)
+LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO")
+LOG_FILE = setup_logging(log_dir=LOG_DIR, level=LOG_LEVEL)
+logger = logging.getLogger("ai_chat.backend")
 
 # CORS middleware
 app.add_middleware(
@@ -47,14 +67,65 @@ app.add_middleware(
 llm_service = LLMService()
 file_service = FileService()
 conversation_service = ConversationService()
+BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # Initialize agent services
 mcp_client = MCPClient()  # Will be configured per request
-skill_manager = SkillManager(workspace_root=os.getcwd())
+skill_manager = SkillManager(
+    workspace_root=BACKEND_ROOT,
+    skills_root=os.path.join(BACKEND_ROOT, "skills"),
+)
 agent_service = AgentService(mcp_client=mcp_client, skill_manager=skill_manager)
 
 # Initialize code service
 code_service = CodeService(llm_service=llm_service)
+
+
+class SkillLoadRequest(BaseModel):
+    """Request model for loading dynamic skills"""
+
+    source: str
+    force_update: bool = False
+
+
+class SkillLoadResponse(BaseModel):
+    """Response model for loading dynamic skills"""
+
+    source: str
+    resolved_path: str
+    loaded_skills: List[str]
+    loaded_count: int
+    errors: List[str]
+
+
+class SkillListResponse(BaseModel):
+    """Response model for listing registered skills"""
+
+    skills: List[Dict[str, Any]]
+    count: int
+
+
+class LogTailResponse(BaseModel):
+    """Response model for backend log tail API"""
+
+    log_file: str
+    total: int
+    lines: List[str]
+
+
+@app.on_event("startup")
+async def load_local_skills_on_startup():
+    """Auto-load local skills from backend/skills on startup."""
+    try:
+        result = await skill_manager.load_skills_from_source(skill_manager.skills_root)
+        if result.get("loaded_count", 0) > 0:
+            logger.info(
+                "Loaded local skills on startup: count=%s names=%s",
+                result.get("loaded_count"),
+                ",".join(result.get("loaded_skills", [])),
+            )
+    except Exception as e:
+        logger.warning("Skip local skill auto-load: %s", str(e))
 
 
 @app.get("/")
@@ -63,10 +134,62 @@ async def root():
     return {"status": "ok", "message": "AI Chat System API"}
 
 
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    start = time.perf_counter()
+    client_ip = request.client.host if request.client else "-"
+    skip_access_log = request.url.path == "/api/logs"
+    try:
+        response: Response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if not skip_access_log:
+            logger.info(
+                "HTTP %s %s status=%s ip=%s duration_ms=%.2f",
+                request.method,
+                request.url.path,
+                response.status_code,
+                client_ip,
+                elapsed_ms,
+            )
+        return response
+    except Exception:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if not skip_access_log:
+            logger.exception(
+                "HTTP %s %s status=500 ip=%s duration_ms=%.2f",
+                request.method,
+                request.url.path,
+                client_ip,
+                elapsed_ms,
+            )
+        raise
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint for Docker"""
     return {"status": "healthy", "service": "AI Chat System", "version": "2.1.0"}
+
+
+@app.get("/api/logs", response_model=LogTailResponse)
+async def get_backend_logs(
+    lines: int = 200,
+    level: Optional[str] = None,
+    contains: Optional[str] = None,
+):
+    """
+    Read backend log tail for UI viewer.
+    """
+    try:
+        return tail_log_file(
+            log_file=LOG_FILE,
+            lines=lines,
+            level=level,
+            contains=contains,
+        )
+    except Exception as e:
+        logger.exception("Failed to read logs")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -105,9 +228,7 @@ async def chat(request: ChatRequest):
 
         return ChatResponse(message=response, conversation_id=conversation_id)
     except Exception as e:
-        import traceback
-
-        print(traceback.format_exc())
+        logger.exception("Chat request failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -136,6 +257,7 @@ async def upload_file(file: UploadFile = File(...)):
             "compression_ratio": result.get("compression_ratio", "100%"),
         }
     except Exception as e:
+        logger.exception("File upload failed: filename=%s", getattr(file, "filename", ""))
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -148,6 +270,7 @@ async def get_conversations():
         conversations = conversation_service.get_all_conversations()
         return conversations
     except Exception as e:
+        logger.exception("Get conversations failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -160,6 +283,7 @@ async def get_conversation(conversation_id: str):
         messages = conversation_service.get_conversation_messages(conversation_id)
         return {"conversation_id": conversation_id, "messages": messages}
     except Exception as e:
+        logger.exception("Get conversation failed: conversation_id=%s", conversation_id)
         raise HTTPException(status_code=404, detail=str(e))
 
 
@@ -172,6 +296,7 @@ async def delete_conversation(conversation_id: str):
         conversation_service.delete_conversation(conversation_id)
         return {"status": "deleted", "conversation_id": conversation_id}
     except Exception as e:
+        logger.exception("Delete conversation failed: conversation_id=%s", conversation_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -255,6 +380,7 @@ async def agent_chat(request: AgentRequest):
         except Exception as e:
             import traceback
 
+            logger.exception("Agent stream failed")
             error_data = {
                 "type": "error",
                 "content": str(e),
@@ -303,6 +429,39 @@ async def get_agent_tools():
             },
         }
     except Exception as e:
+        logger.exception("Get agent tools failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/agent/skills", response_model=SkillListResponse)
+async def list_agent_skills():
+    """
+    List registered skills, including built-in and dynamically loaded skills.
+    """
+    try:
+        skills = skill_manager.list_skills()
+        return {"skills": skills, "count": len(skills)}
+    except Exception as e:
+        logger.exception("List agent skills failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/agent/skills/load", response_model=SkillLoadResponse)
+async def load_agent_skill(request: SkillLoadRequest):
+    """
+    Dynamically load skills from a GitHub repository URL or local path.
+    """
+    try:
+        result = await skill_manager.load_skills_from_source(
+            source=request.source,
+            force_update=request.force_update,
+        )
+        return result
+    except ValueError as e:
+        logger.warning("Load skill validation failed: source=%s, error=%s", request.source, str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("Load skill failed: source=%s", request.source)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -325,6 +484,7 @@ async def configure_agent(config: AgentConfig):
             "config": config.model_dump(),
         }
     except Exception as e:
+        logger.exception("Configure agent failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -368,6 +528,7 @@ async def code_chat(request: CodeRequest):
         except Exception as e:
             import traceback
 
+            logger.exception("Code stream failed")
             error_data = {
                 "type": "error",
                 "content": str(e),
@@ -402,6 +563,7 @@ async def get_code_tools():
             "workspace_root": os.getcwd(),
         }
     except Exception as e:
+        logger.exception("Get code tools failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
