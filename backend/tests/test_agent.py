@@ -86,12 +86,7 @@ async def test_agent_stream():
     for tool in builtin_tools:
         print(f"   - {tool['function']['name']}: {tool['function']['description']}")
 
-    print("\n2. Available Skills:")
-    skill_tools = skill_manager.get_tools()
-    for tool in skill_tools:
-        print(f"   - {tool['function']['name']}: {tool['function']['description']}")
-
-    print(f"\n✓ Total tools available: {len(builtin_tools) + len(skill_tools)}")
+    print(f"\n✓ Total tools available: {len(builtin_tools)}")
 
 
 async def test_tool_format():

@@ -10,6 +10,10 @@
   animation: fadeIn 0.5s ease-in, bounce-in 0.5s ease-out;
 }
 
+.message.user {
+  flex-direction: row-reverse;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -45,6 +49,12 @@
 .message-content {
   flex: 1;
   min-width: 0;
+}
+
+.message.user .message-content {
+  flex: 0 0 66.6667%;
+  max-width: 66.6667%;
+  min-width: 480px;
 }
 
 .message-header {
@@ -97,15 +107,28 @@
 }
 
 .message.user .message-text {
-  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #ffecd2 100%);
+  background: linear-gradient(135deg, #f9a8d4 0%, #fbcfe8 100%);
   color: white;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 16px rgba(255, 105, 180, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.2);
   text-shadow: 1px 1px 2px rgba(255, 105, 180, 0.2);
+  overflow: hidden;
 }
 
 .message.user .message-text::before {
   content: '💕';
+}
+
+.message.user .message-text,
+.message.user .message-text pre {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.message.user .message-text::-webkit-scrollbar,
+.message.user .message-text pre::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .message-text p {
@@ -215,7 +238,7 @@
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid #ffecd2;
+  border-top: 8px solid #fbcfe8;
 }
 
 .message.assistant .message-text::after {
@@ -233,6 +256,12 @@
 @media (max-width: 768px) {
   .message {
     gap: 0.5rem;
+  }
+
+  .message.user .message-content {
+    flex: 1;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .message-avatar {

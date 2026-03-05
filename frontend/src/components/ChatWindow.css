@@ -43,6 +43,16 @@
       rgba(255, 182, 193, 0.02) 80px);
 }
 
+.chat-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.chat-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .welcome-message {
   text-align: center;
   padding: 2rem 1.5rem;
@@ -534,6 +544,22 @@
   max-width: calc(100% - 3.45rem);
 }
 
+.agent-chain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.agent-chain-message {
+  align-items: flex-start;
+}
+
+.agent-chain-message .message-content {
+  width: 66.6667%;
+  max-width: 66.6667%;
+  min-width: 480px;
+}
+
 .agent-live-header {
   display: flex;
   align-items: center;
@@ -600,8 +626,8 @@
 }
 
 .agent-live-steps {
-  max-height: 280px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding: 0.55rem;
   display: flex;
   flex-direction: column;
@@ -652,6 +678,14 @@
   background: #ea6b6b;
 }
 
+.step-dot-confirm {
+  background: #f0a94a;
+}
+
+.step-dot-llm_output {
+  background: #7c8cff;
+}
+
 .dot-running {
   animation: run-dot-pulse 1.2s ease-in-out infinite;
 }
@@ -690,6 +724,9 @@
   border: 1px solid transparent;
   padding: 0.5rem 0.6rem;
   background: rgba(255, 255, 255, 0.72);
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .agent-step-title {
@@ -855,6 +892,189 @@
   background: rgba(255, 235, 235, 0.78);
 }
 
+.agent-step-confirm {
+  border-color: rgba(255, 197, 121, 0.52);
+  background: rgba(255, 246, 221, 0.84);
+}
+
+.agent-step-llm_output {
+  border-color: rgba(154, 168, 255, 0.48);
+  background: rgba(239, 242, 255, 0.78);
+}
+
+.agent-step-actions {
+  margin-top: 0.48rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
+.agent-step-action-btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.24rem 0.58rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-step-action-btn.primary {
+  color: #fff;
+  background: #2f6feb;
+}
+
+.agent-step-action-btn.danger {
+  color: #fff;
+  background: #d64545;
+}
+
+.agent-step-action-btn.neutral {
+  color: #394f66;
+  border-color: rgba(157, 174, 195, 0.66);
+  background: #f6f9fc;
+}
+
+.agent-step-action-btn.selected {
+  box-shadow: 0 0 0 2px rgba(63, 114, 191, 0.25);
+}
+
+.agent-step-selected {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #5d7090;
+}
+
+.agent-llm-live-output {
+  margin-top: 0.4rem;
+  border: 1px solid rgba(169, 184, 205, 0.35);
+  border-radius: 10px;
+  background: rgba(247, 250, 255, 0.92);
+  padding: 0.52rem 0.6rem 0.48rem;
+}
+
+.agent-llm-live-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #4b6077;
+  margin-bottom: 0.28rem;
+}
+
+.agent-llm-live-content {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #33465d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-final-message {
+  margin: 0.35rem 0.55rem 0.65rem 1.45rem;
+  border: 1px solid rgba(163, 176, 198, 0.35);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.86);
+  overflow: hidden;
+}
+
+.agent-final-header {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #4b6077;
+  border-bottom: 1px solid rgba(168, 183, 205, 0.28);
+  background: rgba(244, 248, 254, 0.9);
+}
+
+.agent-final-content {
+  padding: 0.6rem 0.7rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.52;
+  color: #33465d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(15, 23, 35, 0.35);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.agent-confirm-card {
+  width: min(560px, 92vw);
+  border-radius: 14px;
+  border: 1px solid rgba(150, 168, 190, 0.45);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 36px rgba(20, 30, 44, 0.24);
+  padding: 1rem 1rem 0.95rem;
+}
+
+.agent-confirm-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2d3e53;
+  margin-bottom: 0.5rem;
+}
+
+.agent-confirm-message {
+  font-size: 0.9rem;
+  color: #425870;
+  line-height: 1.5;
+}
+
+.agent-confirm-detail {
+  margin: 0.65rem 0 0;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 0.76rem;
+  line-height: 1.36;
+  color: #566b82;
+  background: rgba(242, 247, 253, 0.9);
+  border: 1px solid rgba(177, 194, 214, 0.4);
+  border-radius: 9px;
+  padding: 0.55rem 0.62rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-confirm-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.agent-confirm-btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-confirm-btn.primary {
+  color: #fff;
+  background: #2f6feb;
+}
+
+.agent-confirm-btn.danger {
+  color: #fff;
+  background: #d64545;
+}
+
+.agent-confirm-btn.neutral {
+  color: #394f66;
+  border-color: rgba(157, 174, 195, 0.66);
+  background: #f6f9fc;
+}
+
 /* Streaming Message */
 .streaming-message {
   padding: 0 1rem;
@@ -1003,8 +1223,8 @@
   color: #2e7d32;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 300px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 @keyframes fadeIn {
@@ -1019,6 +1239,12 @@
 
 /* Mobile Responsive for Agent Mode */
 @media (max-width: 768px) {
+  .agent-chain-message .message-content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .agent-live-panel {
     margin: 0.6rem 0.6rem 0.3rem;
   }
@@ -1039,7 +1265,8 @@
   }
 
   .agent-live-steps {
-    max-height: 220px;
+    max-height: none;
+    overflow: visible;
     padding: 0.45rem;
   }
 

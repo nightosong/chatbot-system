@@ -118,13 +118,30 @@ export interface AgentRequest {
 }
 
 export interface AgentStreamEvent {
-  type: 'text' | 'tool_call' | 'tool_result' | 'thinking' | 'error' | 'done' | 'metadata';
+  type:
+    | 'text'
+    | 'tool_call'
+    | 'tool_result'
+    | 'thinking'
+    | 'error'
+    | 'done'
+    | 'metadata'
+    | 'confirmation_required'
+    | 'permission_required';
   content?: string;
   tool?: string;
   args?: any;
   result?: string;
   conversation_id?: string;
   tool_calls_count?: number;
+  title?: string;
+  message?: string;
+  detail?: any;
+  actions?: Array<{
+    label: string;
+    value: string;
+    style?: 'primary' | 'danger' | 'neutral';
+  }>;
 }
 
 export interface ToolCall {

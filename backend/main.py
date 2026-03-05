@@ -12,6 +12,7 @@ import json
 import os
 import time
 import logging
+from contextlib import asynccontextmanager
 from fastapi.responses import StreamingResponse  # type: ignore
 from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
@@ -44,8 +45,6 @@ warnings.filterwarnings(
     category=PendingDeprecationWarning,
 )
 
-app = FastAPI(title="AI Chat System", version="1.0.0")
-
 LOG_DIR = os.getenv(
     "APP_LOG_DIR",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs"),
@@ -53,6 +52,43 @@ LOG_DIR = os.getenv(
 LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO")
 LOG_FILE = setup_logging(log_dir=LOG_DIR, level=LOG_LEVEL)
 logger = logging.getLogger("ai_chat.backend")
+
+# Initialize services
+llm_service = LLMService()
+file_service = FileService()
+conversation_service = ConversationService()
+BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# Initialize skill manager as singleton (shared across all requests)
+skill_manager = SkillManager.get_instance(
+    workspace_root=BACKEND_ROOT,
+    skills_root=os.path.join(BACKEND_ROOT, "skills"),
+)
+
+# Note: AgentService is now created per-request to support different MCP configurations
+# MCP client is also created per-request based on agent config
+
+# Initialize code service
+code_service = CodeService(llm_service=llm_service)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifecycle hooks."""
+    try:
+        result = await skill_manager.load_skills_from_source(skill_manager.skills_root)
+        if result.get("loaded_count", 0) > 0:
+            logger.info(
+                "Loaded local skills on startup: count=%s names=%s",
+                result.get("loaded_count"),
+                ",".join(result.get("loaded_skills", [])),
+            )
+    except Exception as e:
+        logger.warning("Skip local skill auto-load: %s", str(e))
+    yield
+
+
+app = FastAPI(title="AI Chat System", version="1.0.0", lifespan=lifespan)
 
 # CORS middleware
 app.add_middleware(
@@ -62,23 +98,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize services
-llm_service = LLMService()
-file_service = FileService()
-conversation_service = ConversationService()
-BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
-
-# Initialize agent services
-mcp_client = MCPClient()  # Will be configured per request
-skill_manager = SkillManager(
-    workspace_root=BACKEND_ROOT,
-    skills_root=os.path.join(BACKEND_ROOT, "skills"),
-)
-agent_service = AgentService(mcp_client=mcp_client, skill_manager=skill_manager)
-
-# Initialize code service
-code_service = CodeService(llm_service=llm_service)
 
 
 class SkillLoadRequest(BaseModel):
@@ -111,21 +130,6 @@ class LogTailResponse(BaseModel):
     log_file: str
     total: int
     lines: List[str]
-
-
-@app.on_event("startup")
-async def load_local_skills_on_startup():
-    """Auto-load local skills from backend/skills on startup."""
-    try:
-        result = await skill_manager.load_skills_from_source(skill_manager.skills_root)
-        if result.get("loaded_count", 0) > 0:
-            logger.info(
-                "Loaded local skills on startup: count=%s names=%s",
-                result.get("loaded_count"),
-                ",".join(result.get("loaded_skills", [])),
-            )
-    except Exception as e:
-        logger.warning("Skip local skill auto-load: %s", str(e))
 
 
 @app.get("/")
@@ -257,7 +261,9 @@ async def upload_file(file: UploadFile = File(...)):
             "compression_ratio": result.get("compression_ratio", "100%"),
         }
     except Exception as e:
-        logger.exception("File upload failed: filename=%s", getattr(file, "filename", ""))
+        logger.exception(
+            "File upload failed: filename=%s", getattr(file, "filename", "")
+        )
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -296,7 +302,9 @@ async def delete_conversation(conversation_id: str):
         conversation_service.delete_conversation(conversation_id)
         return {"status": "deleted", "conversation_id": conversation_id}
     except Exception as e:
-        logger.exception("Delete conversation failed: conversation_id=%s", conversation_id)
+        logger.exception(
+            "Delete conversation failed: conversation_id=%s", conversation_id
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -329,15 +337,21 @@ async def agent_chat(request: AgentRequest):
             # Create a new MCP client for this request with the specific config
             request_mcp_client = None
             if agent_config.enable_mcp and agent_config.mcp_servers:
-                from services.mcp_client import MCPClient
-
                 request_mcp_client = MCPClient(servers_config=agent_config.mcp_servers)
+
+            # Create a per-request AgentService instance
+            # This allows each request to have its own MCP configuration
+            request_agent_service = AgentService(
+                mcp_client=request_mcp_client,
+                skill_manager=skill_manager  # Share the global skill manager singleton
+            )
 
             # Generate streaming response
             full_response = ""
             tool_calls_log = []
+            final_messages = []
 
-            async for chunk in agent_service.generate_stream(
+            async for chunk in request_agent_service.generate_stream(
                 message=request.message,
                 conversation_history=history,
                 file_context=request.file_context,
@@ -348,8 +362,13 @@ async def agent_chat(request: AgentRequest):
                 enable_mcp=agent_config.enable_mcp,
                 enable_skills=agent_config.enable_skills,
                 max_iterations=agent_config.max_iterations,
-                mcp_client_override=request_mcp_client,
             ):
+                # Capture final messages for saving
+                if chunk.get("type") == "done" and "messages" in chunk:
+                    final_messages = chunk["messages"]
+                    # Don't send this to client, handle it internally
+                    continue
+
                 # Send chunk as SSE
                 event_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {event_data}\n\n"
@@ -360,13 +379,11 @@ async def agent_chat(request: AgentRequest):
                 elif chunk.get("type") == "tool_call":
                     tool_calls_log.append(chunk)
 
-            # Save conversation
-            if full_response:
-                conversation_id = conversation_service.save_message(
+            # Save conversation with complete message history
+            if final_messages:
+                conversation_id = conversation_service.save_messages(
+                    messages=final_messages,
                     conversation_id=request.conversation_id,
-                    user_message=request.message,
-                    assistant_message=full_response,
-                    file_context=request.file_context,
                 )
 
                 # Send final metadata
@@ -376,6 +393,9 @@ async def agent_chat(request: AgentRequest):
                     "tool_calls_count": len(tool_calls_log),
                 }
                 yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
+
+            # Send final done event
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             import traceback
@@ -403,30 +423,22 @@ async def agent_chat(request: AgentRequest):
 async def get_agent_tools():
     """
     Get available agent tools (MCP + Skills)
+    Note: Returns built-in MCP tools only. Per-request MCP tools are configured dynamically.
     """
     try:
         tools = []
 
-        # Get MCP tools
-        mcp_tools = await mcp_client.list_tools()
-        tools.extend(mcp_tools)
-
-        # Get built-in MCP tools
+        # Get built-in MCP tools (always available)
         builtin_tools = BuiltinMCPTools.list_tools()
         tools.extend(builtin_tools)
-
-        # Get custom skills
-        skill_tools = skill_manager.get_tools()
-        tools.extend(skill_tools)
 
         return {
             "tools": tools,
             "count": len(tools),
             "categories": {
-                "mcp": len(mcp_tools),
                 "builtin": len(builtin_tools),
-                "skills": len(skill_tools),
             },
+            "note": "Per-request MCP tools are configured dynamically via agent_config.mcp_servers"
         }
     except Exception as e:
         logger.exception("Get agent tools failed")
@@ -458,7 +470,9 @@ async def load_agent_skill(request: SkillLoadRequest):
         )
         return result
     except ValueError as e:
-        logger.warning("Load skill validation failed: source=%s, error=%s", request.source, str(e))
+        logger.warning(
+            "Load skill validation failed: source=%s, error=%s", request.source, str(e)
+        )
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Load skill failed: source=%s", request.source)
@@ -469,19 +483,16 @@ async def load_agent_skill(request: SkillLoadRequest):
 async def configure_agent(config: AgentConfig):
     """
     Configure agent settings
+
+    Note: With per-request AgentService, MCP configuration is now passed
+    directly in each chat request via agent_config.mcp_servers.
+    This endpoint is kept for backward compatibility but may be deprecated.
     """
     try:
-        # Update MCP client
-        if config.mcp_servers:
-            mcp_client.servers_config = config.mcp_servers
-            mcp_client.clear_cache()
-        else:
-            mcp_client.servers_config = {}
-            mcp_client.clear_cache()
-
         return {
             "status": "configured",
             "config": config.model_dump(),
+            "note": "AgentService now uses per-request configuration. Pass mcp_servers in agent_config for each request."
         }
     except Exception as e:
         logger.exception("Configure agent failed")

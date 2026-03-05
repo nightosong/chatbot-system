@@ -1,10 +1,19 @@
-import pytest
+import pytest  # type: ignore
 
 from services.agent_service import AgentService
 from services.skill_manager import SkillManager
 
 
-def _write_skill(root, folder_name: str, skill_name: str, description: str, script_body: str):
+@pytest.fixture(autouse=True)
+def reset_skill_manager_singletons():
+    """Reset SkillManager singletons before each test to ensure isolation"""
+    yield
+    SkillManager.reset_instances()
+
+
+def _write_skill(
+    root, folder_name: str, skill_name: str, description: str, script_body: str
+):
     skill_dir = root / folder_name
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
@@ -28,7 +37,6 @@ tools: []
 async def test_skill_manager_starts_without_builtin_skills(tmp_path):
     manager = SkillManager(workspace_root=str(tmp_path))
     assert manager.list_skill_names() == []
-    assert manager.get_tools() == []
 
 
 @pytest.mark.asyncio

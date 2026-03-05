@@ -6,23 +6,73 @@ Provides streaming responses and tool calling capabilities
 import json
 import asyncio
 import requests
+import os
+import threading
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
+from services.skill_manager import SkillManager
 
 
 class AgentService:
-    """Service for agent mode with streaming, MCP, and skill support"""
+    """Service for agent mode with streaming, MCP, and skill support.
 
-    def __init__(self, mcp_client=None, skill_manager=None):
+    This service is designed to be instantiated per-request to support
+    different MCP configurations for each request. The skill_manager
+    should be shared across all instances (singleton).
+    """
+
+    # Class-level cache for system prompt (shared across all instances)
+    _default_system_prompt_cache: Optional[str] = None
+    _prompt_cache_lock = threading.Lock()
+
+    def __init__(self, mcp_client=None, skill_manager: SkillManager | None = None):
         """
-        Initialize Agent Service
+        Initialize Agent Service (per-request instance)
 
         Args:
-            mcp_client: MCP client instance for tool calling
-            skill_manager: Skill manager instance for custom skills
+            mcp_client: MCP client instance for tool calling (request-specific)
+            skill_manager: Skill manager instance for custom skills (shared singleton)
         """
         self.mcp_client = mcp_client
         self.skill_manager = skill_manager
+        self._default_system_prompt = self._load_default_system_prompt()
+
+    def _load_default_system_prompt(self) -> str:
+        """Load default system prompt from prompts/general_agent.md with fallback.
+
+        Uses class-level cache to avoid loading the same file multiple times.
+        """
+        # Check cache first
+        if self._default_system_prompt_cache is not None:
+            return self._default_system_prompt_cache
+
+        # Load with lock to avoid race conditions
+        with self._prompt_cache_lock:
+            # Double-check after acquiring lock
+            if self._default_system_prompt_cache is not None:
+                return self._default_system_prompt_cache
+
+            prompt_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "prompts",
+                "general_agent.md",
+            )
+            fallback = (
+                "You are a helpful AI assistant with access to tools and skills.\n"
+                "When you need to perform actions or get information, you can call available tools.\n"
+                "Think step by step and explain your reasoning when using tools."
+            )
+
+            try:
+                with open(prompt_path, "r", encoding="utf-8") as file:
+                    content = file.read().strip()
+                result = content or fallback
+            except Exception:
+                result = fallback
+
+            # Cache the result
+            self._default_system_prompt_cache = result
+            return result
 
     def _deduplicate_tools(self, tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Deduplicate tools by function name to avoid model confusion."""
@@ -50,6 +100,86 @@ class AgentService:
         except Exception:
             return json.dumps({"result": str(normalized)}, ensure_ascii=False)
 
+    def _build_capabilities_prompt(
+        self,
+        tools: List[Dict[str, Any]],
+        skills: List[Dict[str, Any]],
+    ) -> str:
+        """Build capability section with detailed tool and skill metadata.
+
+        This method creates a clear description of available capabilities:
+        - MCP Tools: External tools provided by MCP servers
+        - Skills: Custom execution units with specific behaviors defined in SKILL.md
+        """
+        sections: List[str] = []
+
+        # Separate MCP tools and skills based on whether they appear in skills list
+        skill_names = {skill.get("name") for skill in skills if skill.get("name")}
+        mcp_tools = []
+        skill_tools = []
+
+        for tool in tools:
+            function_info = tool.get("function", {})
+            name = function_info.get("name", "")
+            if not name:
+                continue
+
+            if name in skill_names:
+                skill_tools.append(tool)
+            else:
+                mcp_tools.append(tool)
+
+        # Build MCP tools section
+        if mcp_tools:
+            tool_lines: List[str] = []
+            for item in mcp_tools:
+                function_info = item.get("function", {})
+                name = function_info.get("name", "")
+                description = function_info.get("description", "")
+                parameters = function_info.get("parameters", {})
+                tool_lines.append(
+                    f"- **{name}**\n"
+                    f"  Description: {description}\n"
+                    f"  Parameters: {json.dumps(parameters, ensure_ascii=False)}"
+                )
+            if tool_lines:
+                sections.append(
+                    "[Available MCP Tools]\n"
+                    + "These are external tools provided by MCP servers:\n"
+                    + "\n".join(tool_lines)
+                )
+
+        # Build skills section with more detail
+        if skills:
+            skill_lines: List[str] = []
+            for skill in skills:
+                name = skill.get("name", "")
+                description = skill.get("description", "")
+                metadata = skill.get("metadata", {})
+                if not name:
+                    continue
+
+                skill_line = f"- **{name}**\n  Description: {description}"
+                if metadata:
+                    skill_path = metadata.get("path", "")
+                    if skill_path:
+                        skill_line += f"\n  Location: {skill_path}"
+                skill_lines.append(skill_line)
+
+            if skill_lines:
+                sections.append(
+                    "[Available Skills]\n"
+                    + "These are custom execution units with specific behaviors:\n"
+                    + "\n".join(skill_lines)
+                    + "\n\nNote: Skills are executed in a sandboxed environment. "
+                    + "Pass all required parameters as specified in each skill's description."
+                )
+
+        if not sections:
+            return ""
+
+        return "\n\n" + "\n\n".join(sections)
+
     async def generate_stream(
         self,
         message: str,
@@ -60,7 +190,6 @@ class AgentService:
         enable_mcp: bool = True,
         enable_skills: bool = True,
         max_iterations: int = 10,
-        mcp_client_override=None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Generate streaming agent response with tool calling support
@@ -82,7 +211,7 @@ class AgentService:
             - {"type": "tool_result", "tool": "...", "result": "..."}
             - {"type": "thinking", "content": "..."}
             - {"type": "error", "content": "..."}
-            - {"type": "done"}
+            - {"type": "done", "messages": [...]}  # Final message includes full conversation
         """
         if conversation_history is None:
             conversation_history = []
@@ -102,17 +231,15 @@ class AgentService:
 
             # Get available tools
             tools = []
-            # Use override MCP client if provided, otherwise use instance client
-            active_mcp_client = (
-                mcp_client_override if mcp_client_override else self.mcp_client
-            )
-
-            if enable_mcp and active_mcp_client:
-                mcp_tools = await active_mcp_client.list_tools()
+            if enable_mcp and self.mcp_client:
+                mcp_tools = await self.mcp_client.list_tools()
                 tools.extend(mcp_tools)
+
+            skill_summaries: List[Dict[str, Any]] = []
             if enable_skills and self.skill_manager:
                 skill_tools = self.skill_manager.get_tools()
                 tools.extend(skill_tools)
+                skill_summaries = self.skill_manager.list_skills()
 
             tools = self._deduplicate_tools(tools)
 
@@ -122,8 +249,12 @@ class AgentService:
                 conversation_history,
                 file_context,
                 language,
-                [tool.get("function", {}).get("name", "") for tool in tools],
+                tools,
+                skill_summaries,
             )
+
+            # Store the final messages (will be updated by provider methods)
+            final_messages = []
 
             # Route to appropriate provider
             if provider == "gemini":
@@ -133,8 +264,9 @@ class AgentService:
                     messages,
                     tools,
                     max_iterations,
-                    active_mcp_client,
                 ):
+                    if chunk.get("type") == "done" and "messages" in chunk:
+                        final_messages = chunk["messages"]
                     yield chunk
             elif provider == "skywork_router":
                 async for chunk in self._generate_skywork_router_stream(
@@ -143,8 +275,9 @@ class AgentService:
                     messages,
                     tools,
                     max_iterations,
-                    active_mcp_client,
                 ):
+                    if chunk.get("type") == "done" and "messages" in chunk:
+                        final_messages = chunk["messages"]
                     yield chunk
             else:
                 async for chunk in self._generate_openai_stream(
@@ -154,11 +287,13 @@ class AgentService:
                     messages,
                     tools,
                     max_iterations,
-                    active_mcp_client,
                 ):
+                    if chunk.get("type") == "done" and "messages" in chunk:
+                        final_messages = chunk["messages"]
                     yield chunk
 
-            yield {"type": "done"}
+            # Return final done message with complete conversation
+            yield {"type": "done", "messages": final_messages}
 
         except Exception as e:
             yield {"type": "error", "content": str(e)}
@@ -169,15 +304,14 @@ class AgentService:
         conversation_history: List[dict],
         file_context: Optional[str],
         language: Optional[str],
-        available_tools: Optional[List[str]] = None,
+        available_tools: Optional[List[Dict[str, Any]]] = None,
+        available_skills: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """Build messages for agent mode"""
         messages = []
 
         # System prompt
-        system_content = """You are a helpful AI assistant with access to tools and skills.
-When you need to perform actions or get information, you can call available tools.
-Think step by step and explain your reasoning when using tools."""
+        system_content = self._default_system_prompt
 
         # Add language constraint
         if language and language != "auto":
@@ -193,23 +327,42 @@ Think step by step and explain your reasoning when using tools."""
                 f"\n\n[File Content]\n{file_context}\n[End of File Content]"
             )
 
-        if available_tools:
-            tool_list = ", ".join(sorted([tool for tool in available_tools if tool]))
+        capability_prompt = self._build_capabilities_prompt(
+            available_tools or [],
+            available_skills or [],
+        )
+        if capability_prompt:
             system_content += (
-                "\n\n[Available Tools]\n"
-                f"{tool_list}\n"
-                "Only call tools from this list."
+                capability_prompt + "\n\nOnly call tools from the available tools list."
             )
 
         messages.append({"role": "system", "content": system_content})
 
-        # Add history (last 20 messages)
+        # Add history (last 20 messages, excluding system messages)
+        # Important: Include tool calls and tool results for proper context
         if conversation_history:
             for msg in conversation_history[-20:]:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
-                if role in ["user", "assistant"] and content:
-                    messages.append({"role": role, "content": content})
+
+                # Skip system messages from history
+                if role == "system":
+                    continue
+
+                # Build message with full context
+                history_msg = {"role": role, "content": content}
+
+                # Include tool calls if present (for assistant messages)
+                if role == "assistant" and "tool_calls" in msg:
+                    history_msg["tool_calls"] = msg["tool_calls"]
+
+                # Include tool_call_id if present (for tool messages)
+                if role == "tool" and "tool_call_id" in msg:
+                    history_msg["tool_call_id"] = msg["tool_call_id"]
+
+                # Only add messages with content or tool calls
+                if content or "tool_calls" in history_msg:
+                    messages.append(history_msg)
 
         # Add current message
         messages.append({"role": "user", "content": message})
@@ -224,7 +377,6 @@ Think step by step and explain your reasoning when using tools."""
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         max_iterations: int,
-        mcp_client_override=None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using OpenAI-compatible API with tool calling"""
         # Initialize client
@@ -334,9 +486,7 @@ Think step by step and explain your reasoning when using tools."""
 
                 # Execute tool
                 try:
-                    result = await self._execute_tool(
-                        tool_name, tool_args, mcp_client_override
-                    )
+                    result = await self._execute_tool(tool_name, tool_args)
                     result_str = self._serialize_tool_result(result)
                 except Exception as e:
                     result_str = f"Error executing tool: {str(e)}"
@@ -363,6 +513,10 @@ Think step by step and explain your reasoning when using tools."""
                 "content": "\n\n[Reached maximum tool calling iterations]",
             }
 
+        # Return done with final messages (excluding system message for conversation history)
+        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        yield {"type": "done", "messages": conversation_messages}
+
     async def _generate_skywork_router_stream(
         self,
         api_key: str,
@@ -370,7 +524,6 @@ Think step by step and explain your reasoning when using tools."""
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         max_iterations: int,
-        mcp_client_override=None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using Skywork Router with tool calling"""
         import requests
@@ -461,9 +614,7 @@ Think step by step and explain your reasoning when using tools."""
 
                     # Execute tool
                     try:
-                        result = await self._execute_tool(
-                            tool_name, tool_args, mcp_client_override
-                        )
+                        result = await self._execute_tool(tool_name, tool_args)
                         result_str = self._serialize_tool_result(result)
                     except Exception as e:
                         result_str = f"Error executing tool: {str(e)}"
@@ -506,6 +657,10 @@ Think step by step and explain your reasoning when using tools."""
                 "content": "\n\n[Reached maximum tool calling iterations]",
             }
 
+        # Return done with final messages (excluding system message for conversation history)
+        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        yield {"type": "done", "messages": conversation_messages}
+
     async def _generate_gemini_stream(
         self,
         api_key: str,
@@ -513,10 +668,10 @@ Think step by step and explain your reasoning when using tools."""
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         max_iterations: int,
-        mcp_client_override=None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using Gemini with tool calling"""
         import os
+
         try:
             from google import genai  # type: ignore
         except ImportError as e:
@@ -547,6 +702,10 @@ Think step by step and explain your reasoning when using tools."""
                 if chunk.text:
                     yield {"type": "text", "content": chunk.text}
 
+            # Return done with messages
+            conversation_messages = [msg for msg in messages if msg.get("role") != "system"]
+            yield {"type": "done", "messages": conversation_messages}
+
         except Exception as e:
             yield {"type": "error", "content": f"Gemini error: {str(e)}"}
 
@@ -573,29 +732,48 @@ Think step by step and explain your reasoning when using tools."""
         return tools
 
     async def _execute_tool(
-        self, tool_name: str, tool_args: Dict[str, Any], mcp_client_override=None
+        self, tool_name: str, tool_args: Dict[str, Any]
     ) -> Any:
-        """Execute a tool by name"""
-        # Use override MCP client if provided
-        active_mcp_client = (
-            mcp_client_override if mcp_client_override else self.mcp_client
-        )
+        """Execute a tool by name.
 
-        # Try MCP tools first
-        if active_mcp_client:
-            try:
-                result = await active_mcp_client.call_tool(tool_name, tool_args)
-                return result
-            except Exception:
-                pass
+        This method tries to execute the tool in the following order:
+        1. Check if it's a custom skill (via skill_manager)
+        2. Check if it's an MCP tool (via mcp_client)
+        3. Return error if not found
 
-        # Try custom skills
-        if self.skill_manager:
+        Skills take priority because they are explicitly loaded and have
+        more specific behavior than generic MCP tools.
+        """
+        # Try custom skills first (skills have priority)
+        if self.skill_manager and self.skill_manager.has_skill(tool_name):
             try:
+                # Execute skill with the provided arguments
+                # The skill_manager handles parameter validation and sandbox execution
                 result = await self.skill_manager.execute_skill(tool_name, tool_args)
                 return result
-            except Exception:
+            except Exception as e:
+                # If skill execution fails, return detailed error
+                return {
+                    "error": f"Skill '{tool_name}' execution failed: {str(e)}",
+                    "skill": tool_name,
+                    "type": "skill_error",
+                }
+
+        # Try MCP tools
+        if self.mcp_client:
+            try:
+                result = await self.mcp_client.call_tool(tool_name, tool_args)
+                return result
+            except Exception as e:
+                # MCP tool failed, but maybe it doesn't exist
+                # Continue to the final error handling
                 pass
 
-        # Tool not found
-        return {"error": f"Tool '{tool_name}' not found"}
+        # Tool not found in either skills or MCP tools
+        return {
+            "error": f"Tool '{tool_name}' not found in skills or MCP tools",
+            "tool_name": tool_name,
+            "available_skills": (
+                self.skill_manager.list_skill_names() if self.skill_manager else []
+            ),
+        }

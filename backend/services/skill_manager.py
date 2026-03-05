@@ -1,22 +1,26 @@
 """
-Skill Manager - manages built-in skills and Agent Skills (SKILL.md based).
+Skill Manager for Agent Skills.
 
-Design goals:
-- Follow Agent Skills specification for SKILL.md parsing/validation.
-- Borrow class structure ideas from oh-my-agent (metadata-first skill model).
-- Keep two-phase model:
-  1) load/download/register metadata only (no code execution)
-  2) execute dynamic skills at runtime in subprocess sandbox
+Key principles:
+- Skills are discovered from SKILL.md files.
+- Loading a skill only parses metadata/content; no code executes during load.
+- Skill execution happens on demand in a subprocess sandbox.
+
+This implementation borrows the metadata-first Skill/SkillManager design from
+`oh-my-agent/skills/skill_manager.py`, adapted to this backend.
 """
 
 import asyncio
+import ast
 import json
 import os
 import re
 import subprocess
+import threading
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 try:
@@ -25,124 +29,299 @@ except Exception:
     yaml = None
 
 
+SANDBOX_RUNNER_CODE = textwrap.dedent(
+    """
+    import asyncio
+    import importlib.util
+    import inspect
+    import json
+    import os
+    import socket
+    import sys
+
+
+    def _json_safe(value):
+        try:
+            json.dumps(value)
+            return value
+        except Exception:
+            return str(value)
+
+
+    def _block_network():
+        def _raise(*args, **kwargs):
+            raise RuntimeError("Network access is disabled in skill sandbox")
+
+        socket.create_connection = _raise
+        socket.getaddrinfo = _raise
+
+        class _BlockedSocket:
+            def __init__(self, *args, **kwargs):
+                _raise()
+
+        socket.socket = _BlockedSocket
+
+
+    def _load_module(module_path, module_name):
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if not spec or not spec.loader:
+            raise RuntimeError(f"Failed to load module: {module_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+
+    async def _call_entrypoint(func, arguments, context):
+        params_count = len(inspect.signature(func).parameters)
+
+        if params_count <= 0:
+            result = func()
+        elif params_count == 1:
+            result = func(arguments)
+        else:
+            result = func(arguments, context)
+
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
+
+    def _find_script(scripts_dir):
+        if not scripts_dir or not os.path.isdir(scripts_dir):
+            return None
+        for name in ("run.py", "main.py", "skill.py"):
+            candidate = os.path.join(scripts_dir, name)
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+
+    async def _main():
+        payload = json.loads(sys.argv[1])
+        arguments = payload.get("arguments", {})
+        scripts_dir = payload.get("scripts_dir")
+
+        _block_network()
+
+        context = {
+            "skill_dir": payload.get("skill_dir"),
+            "instruction": payload.get("instruction", ""),
+            "references_dir": payload.get("references_dir"),
+            "assets_dir": payload.get("assets_dir"),
+        }
+
+        script_file = _find_script(scripts_dir)
+        if not script_file:
+            print(json.dumps({
+                "success": False,
+                "error": "No executable script found. Expected scripts/run.py or scripts/main.py",
+            }, ensure_ascii=False))
+            return
+
+        module = _load_module(script_file, "dynamic_skill_runtime")
+        entry = getattr(module, "run", None) or getattr(module, "main", None)
+        if not callable(entry):
+            print(json.dumps({
+                "success": False,
+                "error": "Skill script must expose a callable 'run' or 'main'",
+                "script": script_file,
+            }, ensure_ascii=False))
+            return
+
+        result = await _call_entrypoint(entry, arguments, context)
+        print(json.dumps({"success": True, "result": _json_safe(result)}, ensure_ascii=False))
+
+
+    if __name__ == "__main__":
+        try:
+            asyncio.run(_main())
+        except Exception as e:
+            print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
+            raise
+    """
+).strip()
+
+
 @dataclass
-class SkillDefinition:
-    """Represents one discovered Agent Skill from SKILL.md."""
+class Skill:
+    """Represents a single skill parsed from SKILL.md."""
 
     name: str
     description: str
+    tools: List[str]
     content: str
     directory: Path
-    source: str
-    source_meta: Dict[str, Any] = field(default_factory=dict)
-    tools: List[str] = field(default_factory=list)
-    allowed_tools: Optional[List[str]] = None
-    metadata: Dict[str, str] = field(default_factory=dict)
-    license: Optional[str] = None
-    compatibility: Optional[str] = None
 
 
 class SkillManager:
-    """Manages dynamic Agent Skills discovered from SKILL.md."""
+    """Manages loading, listing, and sandbox execution of skills."""
 
     NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    _instances: Dict[Tuple[str, str, str], "SkillManager"] = {}
+    _instance_lock = threading.Lock()
+
+    def __new__(
+        cls,
+        workspace_root: Optional[str] = None,
+        skills_root: Optional[str] = None,
+        agent_name: Optional[str] = None,
+    ):
+        # Normalize paths to ensure consistent singleton keys
+        # Use normpath to handle different path representations (e.g., "./path" vs "path")
+        workspace = os.path.normpath(
+            os.path.abspath(workspace_root or os.getcwd())
+        )
+        skills = os.path.normpath(
+            os.path.abspath(skills_root or os.path.join(workspace, "skills"))
+        )
+        # Ensure agent_name is always a string (None -> "")
+        agent = agent_name or ""
+
+        key = (workspace, skills, agent)
+
+        with cls._instance_lock:
+            instance = cls._instances.get(key)
+            if instance is None:
+                instance = super().__new__(cls)
+                cls._instances[key] = instance
+        return instance
 
     def __init__(
         self,
         workspace_root: Optional[str] = None,
         skills_root: Optional[str] = None,
+        agent_name: Optional[str] = None,
     ):
-        self.workspace_root = os.path.abspath(workspace_root or os.getcwd())
-        self.skills_root = os.path.abspath(
-            skills_root or os.path.join(self.workspace_root, "skills")
+        """Initialize SkillManager (singleton per workspace/skills_root/agent_name combination).
+
+        Args:
+            workspace_root: Root directory for workspace (default: current directory)
+            skills_root: Root directory for skills (default: workspace_root/skills)
+            agent_name: Optional agent name for namespacing
+        """
+        if getattr(self, "_initialized", False):
+            return
+
+        # Normalize paths consistently with __new__
+        self.workspace_root = os.path.normpath(
+            os.path.abspath(workspace_root or os.getcwd())
+        )
+        self.skills_root = os.path.normpath(
+            os.path.abspath(skills_root or os.path.join(self.workspace_root, "skills"))
         )
         self.dynamic_skills_root = os.path.join(self.skills_root, "github")
+        self.agent_name = agent_name or ""
 
         os.makedirs(self.skills_root, exist_ok=True)
         os.makedirs(self.dynamic_skills_root, exist_ok=True)
 
-        self.dynamic_skills: Dict[str, SkillDefinition] = {}
+        self._skills: Dict[str, Skill] = {}
+        self._disabled_skills: Dict[str, Tuple[Skill, str]] = {}
+        self._initialized = True
+
+    @classmethod
+    def get_instance(
+        cls,
+        workspace_root: Optional[str] = None,
+        skills_root: Optional[str] = None,
+        agent_name: Optional[str] = None,
+    ) -> "SkillManager":
+        return cls(
+            workspace_root=workspace_root,
+            skills_root=skills_root,
+            agent_name=agent_name,
+        )
+
+    @classmethod
+    def reset_instances(cls):
+        with cls._instance_lock:
+            cls._instances.clear()
 
     def has_skill(self, skill_name: str) -> bool:
-        return skill_name in self.dynamic_skills
+        return skill_name in self._skills
 
     def list_skill_names(self) -> List[str]:
-        return sorted(self.dynamic_skills.keys())
+        return sorted(self._skills.keys())
+
+    def get_skill(self, name: str) -> Optional[Skill]:
+        return self._skills.get(name)
+
+    def get_all_skills(self) -> List[Skill]:
+        return [self._skills[name] for name in sorted(self._skills.keys())]
+
+    def get_disabled_skills(self) -> Dict[str, Dict[str, Any]]:
+        data: Dict[str, Dict[str, Any]] = {}
+        for name, (skill, reason) in self._disabled_skills.items():
+            data[name] = {
+                "name": skill.name,
+                "description": skill.description,
+                "reason": reason,
+                "path": str(skill.directory),
+            }
+        return data
 
     def list_skills(self) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
-
-        for name, spec in self.dynamic_skills.items():
+        for skill in self.get_all_skills():
             items.append(
                 {
-                    "name": name,
-                    "description": spec.description,
-                    "source": spec.source,
+                    "name": skill.name,
+                    "description": skill.description,
                     "metadata": {
-                        "path": str(spec.directory),
-                        "instruction": str(spec.directory / "SKILL.md"),
-                        "scripts_dir": str(spec.directory / "scripts"),
-                        "license": spec.license,
-                        "compatibility": spec.compatibility,
-                        "allowed_tools": spec.allowed_tools,
-                        **spec.source_meta,
-                        **spec.metadata,
+                        "path": str(skill.directory),
+                        "instruction": str(skill.directory / "SKILL.md"),
+                        "scripts_dir": str(skill.directory / "scripts"),
                     },
                 }
             )
-
-        return sorted(items, key=lambda x: x["name"])
+        return items
 
     def get_tools(self) -> List[Dict[str, Any]]:
-        tools = []
+        """Expose loaded skills as callable function tools for LLM tool-calling.
 
-        for name, spec in self.dynamic_skills.items():
+        Returns skill tools that can be called by the agent. Each skill's parameters
+        are dynamically determined from its SKILL.md content and implementation.
+        For now, we use a flexible schema that accepts any parameters the skill needs.
+        """
+        tools: List[Dict[str, Any]] = []
+        for skill in self.get_all_skills():
+            # Build a flexible parameter schema that accepts any JSON object
+            # The actual validation happens in the skill's run/main function
             tools.append(
                 {
                     "type": "function",
                     "function": {
-                        "name": name,
-                        "description": spec.description,
+                        "name": skill.name,
+                        "description": (
+                            f"{skill.description}\n\n"
+                            f"Skill location: {skill.directory}\n"
+                            f"This skill will be executed in a sandboxed environment with the provided parameters."
+                        ),
                         "parameters": {
                             "type": "object",
-                            "description": "Dynamic skill input. Schema is defined by SKILL.md and scripts.",
-                            "properties": {},
+                            "properties": {},  # Accept any parameters
                             "required": [],
-                            "additionalProperties": True,
+                            "additionalProperties": True,  # Allow any additional properties
                         },
                     },
                 }
             )
-
         return tools
 
     async def load_skills_from_source(
         self, source: str, force_update: bool = False
     ) -> Dict[str, Any]:
         """
-        Download/sync source and register skills by discovering SKILL.md.
-        NOTE: loading stage does not execute scripts.
+        Load skills from github/local source by discovering SKILL.md recursively.
+        No skill code is executed in this stage.
         """
         source_path, source_meta = await asyncio.to_thread(
             self._prepare_source_path, source, force_update
         )
 
-        skill_files = self._discover_skill_files(source_path)
-        if not skill_files:
-            raise ValueError(
-                "No valid skill found. A skill directory must contain SKILL.md"
-            )
-
-        loaded: List[str] = []
-        errors: List[str] = []
-
-        for skill_file in skill_files:
-            try:
-                parsed = self._parse_skill_file(skill_file, source_meta)
-                self.dynamic_skills[parsed.name] = parsed
-                loaded.append(parsed.name)
-            except Exception as e:
-                errors.append(f"{skill_file}: {str(e)}")
+        loaded, errors = await asyncio.to_thread(
+            self._load_skills_from_path, source_path, source_meta
+        )
 
         if not loaded and errors:
             raise ValueError("; ".join(errors))
@@ -154,6 +333,29 @@ class SkillManager:
             "loaded_count": len(loaded),
             "errors": errors,
         }
+
+    def _load_skills_from_path(
+        self, source_path: str, source_meta: Dict[str, Any]
+    ) -> Tuple[List[str], List[str]]:
+        skill_files = self._discover_skill_files(source_path)
+        if not skill_files:
+            raise ValueError(
+                "No valid skill found. A skill directory must contain SKILL.md"
+            )
+
+        loaded: List[str] = []
+        errors: List[str] = []
+
+        for skill_file in skill_files:
+            try:
+                skill = self._parse_skill_file(skill_file, source_meta)
+
+                self._skills[skill.name] = skill
+                loaded.append(skill.name)
+            except Exception as e:
+                errors.append(f"{skill_file}: {str(e)}")
+
+        return loaded, errors
 
     def _prepare_source_path(
         self, source: str, force_update: bool = False
@@ -181,7 +383,9 @@ class SkillManager:
             }
 
         local_path = os.path.abspath(
-            source if os.path.isabs(source) else os.path.join(self.workspace_root, source)
+            source
+            if os.path.isabs(source)
+            else os.path.join(self.workspace_root, source)
         )
         if not os.path.isdir(local_path):
             raise ValueError(f"Skill source path does not exist: {local_path}")
@@ -255,25 +459,56 @@ class SkillManager:
                 result.append(Path(root) / "SKILL.md")
         return sorted(result)
 
-    def _parse_skill_file(self, skill_file: Path, source_meta: Dict[str, Any]) -> SkillDefinition:
+    def _parse_skill_file(self, skill_file: Path, source_meta: Dict[str, Any]) -> Skill:
         content = skill_file.read_text(encoding="utf-8")
-        frontmatter, body = self._split_frontmatter(content)
+        frontmatter, markdown = self._split_frontmatter(content)
         metadata = self._parse_frontmatter_yaml(frontmatter)
 
         name = str(metadata.get("name", "")).strip()
         description = str(metadata.get("description", "")).strip()
+        tools = metadata.get("tools", [])
+        model = metadata.get("model")
+        allowed_tools_field = metadata.get("allowed-tools") or metadata.get(
+            "allowed_tools"
+        )
+        mcp = metadata.get("mcp")
+        subtask = metadata.get("subtask", False)
         license_field = metadata.get("license")
         compatibility = metadata.get("compatibility")
         metadata_field = metadata.get("metadata")
-        allowed_tools_field = metadata.get("allowed-tools")
 
         self._validate_name(name, skill_file.parent.name)
         self._validate_description(description)
 
-        if compatibility is not None:
-            compatibility = str(compatibility).strip()
-            if len(compatibility) > 500:
-                raise ValueError("compatibility must be <= 500 characters")
+        if not isinstance(tools, list):
+            tools = [str(tools)] if tools else []
+        tools = [str(tool).strip() for tool in tools if str(tool).strip()]
+
+        if model is not None:
+            model = str(model).strip() or None
+
+        allowed_tools: Optional[List[str]] = None
+        if allowed_tools_field is not None:
+            if isinstance(allowed_tools_field, str):
+                allowed_tools = [
+                    item.strip() for item in allowed_tools_field.split() if item.strip()
+                ]
+            elif isinstance(allowed_tools_field, list):
+                allowed_tools = [
+                    str(item).strip()
+                    for item in allowed_tools_field
+                    if str(item).strip()
+                ]
+            else:
+                raise ValueError("allowed-tools must be a string or list")
+
+        if mcp is not None and not isinstance(mcp, dict):
+            raise ValueError("mcp must be a mapping")
+
+        if isinstance(subtask, str):
+            subtask = subtask.lower() in {"true", "1", "yes"}
+        else:
+            subtask = bool(subtask)
 
         parsed_metadata: Dict[str, str] = {}
         if metadata_field is not None:
@@ -281,38 +516,26 @@ class SkillManager:
                 raise ValueError("metadata must be a mapping")
             parsed_metadata = {str(k): str(v) for k, v in metadata_field.items()}
 
-        allowed_tools: Optional[List[str]] = None
-        if allowed_tools_field is not None:
-            if isinstance(allowed_tools_field, str):
-                allowed_tools = [item for item in allowed_tools_field.split() if item.strip()]
-            elif isinstance(allowed_tools_field, list):
-                allowed_tools = [str(item).strip() for item in allowed_tools_field if str(item).strip()]
-            else:
-                raise ValueError("allowed-tools must be a string or list")
+        if compatibility is not None:
+            compatibility = str(compatibility).strip()
+            if len(compatibility) > 500:
+                raise ValueError("compatibility must be <= 500 characters")
 
-        return SkillDefinition(
+        return Skill(
             name=name,
             description=description,
-            content=body.strip(),
+            tools=tools,
+            content=markdown.strip(),
             directory=skill_file.parent,
-            source=source_meta.get("type", "dynamic"),
-            source_meta=source_meta,
-            tools=[],
-            allowed_tools=allowed_tools,
-            metadata=parsed_metadata,
-            license=str(license_field).strip() if license_field else None,
-            compatibility=compatibility,
         )
 
     def _split_frontmatter(self, content: str) -> tuple[str, str]:
         if not content.startswith("---"):
             raise ValueError("SKILL.md must start with YAML frontmatter")
-
         pattern = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)$", re.DOTALL)
         match = pattern.match(content)
         if not match:
             raise ValueError("Invalid YAML frontmatter format in SKILL.md")
-
         return match.group(1), match.group(2)
 
     def _parse_frontmatter_yaml(self, frontmatter: str) -> Dict[str, Any]:
@@ -320,7 +543,6 @@ class SkillManager:
             parsed = yaml.safe_load(frontmatter) or {}
         else:
             parsed = self._simple_yaml_parse(frontmatter)
-
         if not isinstance(parsed, dict):
             raise ValueError("Frontmatter must be a YAML mapping")
         return parsed
@@ -343,9 +565,11 @@ class SkillManager:
             if ":" in line:
                 if current_key and current_list is not None:
                     result[current_key] = current_list
+
                 parts = line.split(":", 1)
                 key = parts[0].strip()
                 value = parts[1].strip().strip('"').strip("'")
+
                 if value == "":
                     current_key = key
                     current_list = []
@@ -360,6 +584,11 @@ class SkillManager:
         return result
 
     def _validate_name(self, name: str, dir_name: str):
+        """Validate skill name.
+
+        Note: We don't enforce that name must match directory name, as the skill name
+        is a logical identifier while directory name is just filesystem organization.
+        """
         if not name:
             raise ValueError("Missing required field: name")
         if len(name) > 64:
@@ -370,10 +599,6 @@ class SkillManager:
             )
         if "--" in name:
             raise ValueError("name must not contain consecutive hyphens")
-        if name != dir_name:
-            raise ValueError(
-                f"name '{name}' must match parent directory name '{dir_name}'"
-            )
 
     def _validate_description(self, description: str):
         if not description:
@@ -390,27 +615,29 @@ class SkillManager:
                 "skill": skill_name,
             }
 
-        spec = self.dynamic_skills.get(skill_name)
-        if not spec:
+        skill = self._skills.get(skill_name)
+        if not skill:
             return {"error": f"Skill '{skill_name}' not found", "skill": skill_name}
 
-        return await self._execute_dynamic_skill_in_sandbox(spec, arguments)
+        return await self._execute_skill_in_sandbox(skill, arguments)
 
-    async def _execute_dynamic_skill_in_sandbox(
-        self, spec: SkillDefinition, arguments: Dict[str, Any]
+    async def _execute_skill_in_sandbox(
+        self, skill: Skill, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
-        skill_dir = str(spec.directory)
-        timeout = int(arguments.pop("__timeout", os.getenv("SKILL_SANDBOX_TIMEOUT", "20")))
+        skill_dir = str(skill.directory)
+        timeout = int(
+            arguments.pop("__timeout", os.getenv("SKILL_SANDBOX_TIMEOUT", "20"))
+        )
         timeout = max(3, min(timeout, 120))
 
         runner_code = self._build_sandbox_runner_code()
         payload = {
             "arguments": arguments,
             "skill_dir": skill_dir,
-            "instruction": spec.content,
-            "scripts_dir": str(spec.directory / "scripts"),
-            "references_dir": str(spec.directory / "references"),
-            "assets_dir": str(spec.directory / "assets"),
+            "instruction": skill.content,
+            "scripts_dir": str(skill.directory / "scripts"),
+            "references_dir": str(skill.directory / "references"),
+            "assets_dir": str(skill.directory / "assets"),
         }
 
         python_exec = os.getenv("SKILL_PYTHON_EXECUTABLE", "python3")
@@ -459,7 +686,13 @@ class SkillManager:
         try:
             completed = await asyncio.to_thread(
                 subprocess.run,
-                [python_exec, "-I", "-c", runner_code, json.dumps(payload, ensure_ascii=False)],
+                [
+                    python_exec,
+                    "-I",
+                    "-c",
+                    runner_code,
+                    json.dumps(payload, ensure_ascii=False),
+                ],
                 cwd=skill_dir,
                 capture_output=True,
                 text=True,
@@ -471,13 +704,13 @@ class SkillManager:
             return {
                 "success": False,
                 "error": f"Dynamic skill timed out after {timeout}s",
-                "skill": spec.name,
+                "skill": skill.name,
             }
         except Exception as e:
             return {
                 "success": False,
                 "error": f"Dynamic skill sandbox failed: {str(e)}",
-                "skill": spec.name,
+                "skill": skill.name,
             }
 
         stdout_text = (completed.stdout or "").strip()
@@ -498,116 +731,8 @@ class SkillManager:
             if stderr_text:
                 parsed.setdefault("stderr", stderr_text)
 
-        parsed.setdefault("skill", spec.name)
+        parsed.setdefault("skill", skill.name)
         return parsed
 
     def _build_sandbox_runner_code(self) -> str:
-        return r'''
-import asyncio
-import importlib.util
-import inspect
-import json
-import os
-import socket
-import sys
-
-
-def _json_safe(value):
-    try:
-        json.dumps(value)
-        return value
-    except Exception:
-        return str(value)
-
-
-def _block_network():
-    def _raise(*args, **kwargs):
-        raise RuntimeError("Network access is disabled in skill sandbox")
-
-    socket.create_connection = _raise
-    socket.getaddrinfo = _raise
-
-    class _BlockedSocket:
-        def __init__(self, *args, **kwargs):
-            _raise()
-
-    socket.socket = _BlockedSocket
-
-
-def _load_module(module_path, module_name):
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if not spec or not spec.loader:
-        raise RuntimeError(f"Failed to load module: {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-async def _call_entrypoint(func, arguments, context):
-    params_count = len(inspect.signature(func).parameters)
-
-    if params_count <= 0:
-        result = func()
-    elif params_count == 1:
-        result = func(arguments)
-    else:
-        result = func(arguments, context)
-
-    if inspect.isawaitable(result):
-        return await result
-    return result
-
-
-def _find_script(scripts_dir):
-    if not scripts_dir or not os.path.isdir(scripts_dir):
-        return None
-    for name in ("run.py", "main.py", "skill.py"):
-        candidate = os.path.join(scripts_dir, name)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
-
-
-async def _main():
-    payload = json.loads(sys.argv[1])
-    arguments = payload.get("arguments", {})
-    scripts_dir = payload.get("scripts_dir")
-
-    _block_network()
-
-    context = {
-        "skill_dir": payload.get("skill_dir"),
-        "instruction": payload.get("instruction", ""),
-        "references_dir": payload.get("references_dir"),
-        "assets_dir": payload.get("assets_dir"),
-    }
-
-    script_file = _find_script(scripts_dir)
-    if not script_file:
-        print(json.dumps({
-            "success": False,
-            "error": "No executable script found. Expected scripts/run.py or scripts/main.py",
-        }, ensure_ascii=False))
-        return
-
-    module = _load_module(script_file, "dynamic_skill_runtime")
-    entry = getattr(module, "run", None) or getattr(module, "main", None)
-    if not callable(entry):
-        print(json.dumps({
-            "success": False,
-            "error": "Skill script must expose a callable 'run' or 'main'",
-            "script": script_file,
-        }, ensure_ascii=False))
-        return
-
-    result = await _call_entrypoint(entry, arguments, context)
-    print(json.dumps({"success": True, "result": _json_safe(result)}, ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(_main())
-    except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False))
-        raise
-'''
+        return SANDBOX_RUNNER_CODE

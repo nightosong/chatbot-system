@@ -18,10 +18,19 @@ interface ChatWindowProps {
 
 interface AgentStep {
   id: number;
-  type: 'status' | 'thinking' | 'tool_call' | 'tool_result' | 'error';
+  type:
+    | 'status'
+    | 'thinking'
+    | 'tool_call'
+    | 'tool_result'
+    | 'error'
+    | 'confirm'
+    | 'llm_output';
   title: string;
   detail?: string;
   timestamp: string;
+  actions?: ConfirmAction[];
+  selectedAction?: string;
 }
 
 interface AgentRun {
@@ -30,12 +39,19 @@ interface AgentRun {
   steps: AgentStep[];
   startedAt: string;
   finishedAt?: string;
+  summary?: string;
 }
 
 interface MediaPreviewItem {
   url: string;
   type: 'image' | 'video';
   coverUrl?: string;
+}
+
+interface ConfirmAction {
+  label: string;
+  value: string;
+  style?: 'primary' | 'danger' | 'neutral';
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -51,7 +67,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
   const [collapsedRuns, setCollapsedRuns] = useState<Record<number, boolean>>({});
-  const [streamingContent, setStreamingContent] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stepIdRef = useRef<number>(0);
   const runIdRef = useRef<number>(0);
@@ -73,7 +88,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingContent, agentRuns]);
+  }, [messages, agentRuns]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -178,12 +193,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     language: string | null
   ) => {
     // Reset streaming state
-    setStreamingContent('');
-
     // Get agent config
     const agentConfig = agentConfigService.getAgentConfig();
 
-    let fullContent = '';
+    let latestLlmSegment = '';
+    let currentLlmStepId: number | null = null;
+    let currentLlmText = '';
     const runId = ++runIdRef.current;
     setActiveRunId(runId);
     setCollapsedRuns((prev) => ({ ...prev, [runId]: false }));
@@ -197,7 +212,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       },
     ]);
 
-    const appendStep = (targetRunId: number, step: Omit<AgentStep, 'id' | 'timestamp'>) => {
+    const appendStep = (
+      targetRunId: number,
+      step: Omit<AgentStep, 'id' | 'timestamp'>
+    ): number => {
       const nextStep: AgentStep = {
         ...step,
         id: ++stepIdRef.current,
@@ -208,6 +226,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           run.id === targetRunId ? { ...run, steps: [...run.steps, nextStep] } : run
         )
       );
+      return nextStep.id;
     };
 
     const updateRunStatus = (targetRunId: number, status: AgentRun['status']) => {
@@ -224,6 +243,25 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       appendStep(runId, step);
     };
 
+    const updateStepDetail = (
+      targetRunId: number,
+      targetStepId: number,
+      detail: string
+    ) => {
+      setAgentRuns((prev) =>
+        prev.map((run) =>
+          run.id !== targetRunId
+            ? run
+            : {
+                ...run,
+                steps: run.steps.map((step) =>
+                  step.id === targetStepId ? { ...step, detail } : step
+                ),
+              }
+        )
+      );
+    };
+
     const normalizeDetail = (value: unknown): string => {
       if (value === undefined || value === null) return '';
       if (typeof value === 'string') return value;
@@ -234,12 +272,42 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       }
     };
 
+    const flushLlmOutputStep = () => {
+      if (currentLlmStepId === null) return;
+      const normalized = currentLlmText.trim();
+      if (normalized) {
+        latestLlmSegment = normalized;
+      }
+      currentLlmStepId = null;
+      currentLlmText = '';
+    };
+
+    const pushLlmChunk = (chunk: string) => {
+      if (!chunk) return;
+      const nextText = currentLlmText + chunk;
+      currentLlmText = nextText;
+      if (currentLlmStepId === null) {
+        currentLlmStepId = appendStep(runId, {
+          type: 'llm_output',
+          title: 'LLM 输出',
+          detail: nextText,
+        });
+      } else {
+        updateStepDetail(runId, currentLlmStepId, nextText);
+      }
+    };
+
     const handleAgentEvent = (event: AgentStreamEvent) => {
+      const isConfirmEvent =
+        event.type === 'confirmation_required' || event.type === 'permission_required';
+
       if (event.type === 'text') {
-        fullContent += event.content || '';
-        setStreamingContent(fullContent);
+        const chunk = event.content || '';
+        pushLlmChunk(chunk);
         return;
       }
+
+      flushLlmOutputStep();
 
       if (event.type === 'thinking') {
         addStep({
@@ -247,6 +315,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           title: '思考中',
           detail: event.content || '',
         });
+        return;
+      }
+
+      if (isConfirmEvent) {
+        const defaultActions: ConfirmAction[] = [
+          { label: '确认执行', value: 'confirm', style: 'primary' },
+          { label: '取消', value: 'cancel', style: 'danger' },
+          { label: '稍后处理', value: 'defer', style: 'neutral' },
+        ];
+        const actions =
+          Array.isArray(event.actions) && event.actions.length > 0
+            ? event.actions.slice(0, 3)
+            : defaultActions;
+        const detail = normalizeDetail(event.detail ?? event.args ?? '');
+
+        addStep({
+          type: 'confirm',
+          title: event.title || '等待确认',
+          detail: event.message || event.content || '请确认是否继续执行下一步操作。',
+          actions,
+        });
+        if (detail && detail !== '""') {
+          addStep({
+            type: 'status',
+            title: '确认上下文',
+            detail,
+          });
+        }
         return;
       }
 
@@ -285,8 +381,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       }
 
       if (event.type === 'error') {
-        fullContent += `\n\n❌ Error: ${event.content}`;
-        setStreamingContent(fullContent);
         addStep({
           type: 'error',
           title: '执行异常',
@@ -313,6 +407,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       },
       handleAgentEvent
     );
+    flushLlmOutputStep();
 
     setAgentRuns((prev) =>
       prev.map((run) =>
@@ -322,16 +417,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       )
     );
 
-    // Add final assistant message
-    const assistantMessage: Message = {
-      role: 'assistant',
-      content: fullContent,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
+    setAgentRuns((prev) =>
+      prev.map((run) =>
+        run.id === runId
+          ? {
+              ...run,
+              summary: (latestLlmSegment || '').trim(),
+              finishedAt: new Date().toISOString(),
+            }
+          : run
+      )
+    );
 
-    // Clear streaming state
-    setStreamingContent('');
     setActiveRunId(null);
   };
 
@@ -458,6 +555,35 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
+  const visibleMessages =
+    chatMode === 'agent' && agentRuns.length > 0
+      ? messages.filter((message) => message.role === 'user')
+      : messages;
+
+  const formatConfirmActionLabel = (value?: string): string => {
+    if (value === 'confirm') return '已确认执行';
+    if (value === 'cancel') return '已取消执行';
+    if (value === 'defer') return '已选择稍后处理';
+    return `已选择: ${value || 'unknown'}`;
+  };
+
+  const handleConfirmAction = (runId: number, stepId: number, action: ConfirmAction) => {
+    setAgentRuns((prev) =>
+      prev.map((run) =>
+        run.id === runId
+          ? {
+              ...run,
+              steps: run.steps.map((step) =>
+                step.id === stepId
+                  ? { ...step, selectedAction: action.value }
+                  : step
+              ),
+            }
+          : run
+      )
+    );
+  };
+
   return (
     <div className="chat-window">
       <div className="chat-content">
@@ -528,11 +654,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           </div>
         ) : (
           <>
-            <MessageList messages={messages} isLoading={isLoading && chatMode !== 'agent'} />
+            <MessageList messages={visibleMessages} isLoading={isLoading && chatMode !== 'agent'} />
             {chatMode === 'agent' && agentRuns.length > 0 && (
-              <div className="agent-runs-list">
-                {[...agentRuns].reverse().map((run) => (
-                  <div key={run.id} className="agent-live-panel">
+              <div className="agent-chain-list">
+                {agentRuns.map((run) => (
+                  <div key={run.id} className="message assistant agent-chain-message">
+                    <div className="message-avatar">✨</div>
+                    <div className="message-content">
+                      <div className="agent-live-panel">
                     <button
                       type="button"
                       className="agent-live-header"
@@ -543,7 +672,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                         ▾
                       </span>
                       <span className="agent-live-title">
-                        Agent 执行过程 #{run.id}
+                        Agent 执行链路 #{run.id}
                       </span>
                       <span className={`agent-live-status agent-live-status-${run.status}`}>
                         {run.status === 'running' ? '执行中' : run.status === 'completed' ? '已完成' : '异常'}
@@ -583,29 +712,47 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                                   </div>
                                 </div>
                                 {renderStepDetail(step)}
+                                {step.type === 'confirm' && step.actions && step.actions.length > 0 && (
+                                  <div className="agent-step-actions">
+                                    {step.actions.slice(0, 3).map((action) => {
+                                      const selected = step.selectedAction === action.value;
+                                      return (
+                                        <button
+                                          key={`${step.id}-${action.value}`}
+                                          type="button"
+                                          className={`agent-step-action-btn ${action.style || 'neutral'} ${selected ? 'selected' : ''}`}
+                                          onClick={() => handleConfirmAction(run.id, step.id, action)}
+                                        >
+                                          {selected ? `${action.label} ✓` : action.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {step.type === 'confirm' && step.selectedAction && (
+                                  <div className="agent-step-selected">
+                                    {formatConfirmActionLabel(step.selectedAction)}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
                         })}
                       </div>
                     )}
+                    {!!run.summary && (
+                      <div className="agent-final-message">
+                        <div className="agent-final-header">AI 最终总结</div>
+                        <div className="agent-final-content">{run.summary}</div>
+                      </div>
+                    )}
+                      </div>
+                    </div>
                   </div>
                 ))}
                 {activeRunId && (
                   <div className="agent-live-hint">正在持续更新执行中间信息…</div>
                 )}
-              </div>
-            )}
-            {streamingContent && (
-              <div className="streaming-message agent-draft-message">
-                <div className="message assistant">
-                  <div className="message-content">{streamingContent}</div>
-                  <div className="streaming-indicator">
-                    <span className="dot"></span>
-                    <span className="dot"></span>
-                    <span className="dot"></span>
-                  </div>
-                </div>
               </div>
             )}
           </>

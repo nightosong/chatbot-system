@@ -47,6 +47,7 @@ class ConversationService:
                 content TEXT,
                 timestamp TEXT,
                 file_context TEXT,
+                metadata TEXT,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
@@ -110,32 +111,120 @@ class ConversationService:
         
         conn.commit()
         conn.close()
-        
+
+        return conversation_id
+
+    def save_messages(
+        self,
+        messages: List[dict],
+        conversation_id: Optional[str] = None,
+        title: Optional[str] = None
+    ) -> str:
+        """
+        Save multiple messages to database (supports tool calls and complete message history)
+
+        Args:
+            messages: List of message dictionaries with role, content, and optional metadata
+            conversation_id: Existing conversation ID or None for new conversation
+            title: Optional conversation title (for new conversations)
+
+        Returns:
+            conversation_id
+        """
+        if not messages:
+            raise ValueError("Messages list cannot be empty")
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # Create new conversation if needed
+        if not conversation_id:
+            conversation_id = str(uuid.uuid4())
+            # Generate title from first user message if not provided
+            if not title:
+                first_user_msg = next((m for m in messages if m.get("role") == "user"), None)
+                if first_user_msg:
+                    title = self._generate_title(first_user_msg.get("content", "New conversation"))
+                else:
+                    title = "New conversation"
+
+            now = datetime.now().isoformat()
+            cursor.execute(
+                "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (conversation_id, title, now, now)
+            )
+        else:
+            # Update conversation timestamp
+            now = datetime.now().isoformat()
+            cursor.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (now, conversation_id)
+            )
+
+        # Save all messages
+        timestamp = datetime.now().isoformat()
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+
+            # Serialize metadata (tool_calls, tool_call_id, etc.)
+            metadata = {}
+            if "tool_calls" in msg:
+                metadata["tool_calls"] = msg["tool_calls"]
+            if "tool_call_id" in msg:
+                metadata["tool_call_id"] = msg["tool_call_id"]
+
+            metadata_json = json.dumps(metadata) if metadata else None
+
+            cursor.execute(
+                "INSERT INTO messages (conversation_id, role, content, timestamp, file_context, metadata) VALUES (?, ?, ?, ?, ?, ?)",
+                (conversation_id, role, content, timestamp, None, metadata_json)
+            )
+
+        conn.commit()
+        conn.close()
+
         return conversation_id
     
     def get_conversation_messages(self, conversation_id: str) -> List[dict]:
         """
-        Get all messages for a conversation
-        
+        Get all messages for a conversation (including tool calls metadata)
+
         Args:
             conversation_id: Conversation ID
-            
+
         Returns:
-            List of message dictionaries
+            List of message dictionaries with full context
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute(
-            "SELECT role, content, timestamp FROM messages WHERE conversation_id = ? ORDER BY timestamp",
+            "SELECT role, content, timestamp, metadata FROM messages WHERE conversation_id = ? ORDER BY timestamp",
             (conversation_id,)
         )
-        
-        messages = [
-            {"role": row[0], "content": row[1], "timestamp": row[2]}
-            for row in cursor.fetchall()
-        ]
-        
+
+        messages = []
+        for row in cursor.fetchall():
+            msg = {
+                "role": row[0],
+                "content": row[1],
+                "timestamp": row[2]
+            }
+
+            # Deserialize metadata if present
+            if row[3]:
+                try:
+                    metadata = json.loads(row[3])
+                    if "tool_calls" in metadata:
+                        msg["tool_calls"] = metadata["tool_calls"]
+                    if "tool_call_id" in metadata:
+                        msg["tool_call_id"] = metadata["tool_call_id"]
+                except json.JSONDecodeError:
+                    pass  # Ignore invalid metadata
+
+            messages.append(msg)
+
         conn.close()
         return messages
     
