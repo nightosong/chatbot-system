@@ -3,6 +3,16 @@ import './ModelSettings.css';
 import './PlatformIcons.css';
 import { ModelConfig } from '../types';
 import { modelConfigService } from '../services/modelConfig';
+import {
+  IconBulb,
+  IconClose,
+  IconPlus,
+  IconSettings,
+  IconSparkles,
+  IconStar,
+  IconTrash,
+} from './icons/AppIcons';
+import { PlatformBadge } from './icons/PlatformIcons';
 
 interface ModelSettingsProps {
   onClose: () => void;
@@ -29,6 +39,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
     enabled: true,
     baseUrl: '',
   });
+  const selectedPlatformOption =
+    PLATFORM_OPTIONS.find((option) => option.value === newModel.platform) || PLATFORM_OPTIONS[0];
 
   // Load models from service on mount
   useEffect(() => {
@@ -101,9 +113,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
   };
 
   const getPlatformIcon = (platform: string) => {
-    const option = PLATFORM_OPTIONS.find(p => p.value === platform);
-    const iconClass = option?.icon || 'openai';
-    return <div className={`platform-icon platform-icon-${iconClass}`}></div>;
+    return <PlatformBadge platform={platform} />;
   };
 
   const getPlatformLabel = (platform: string) => {
@@ -114,15 +124,20 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>⚙️ 模型设置</h2>
-          <button className="close-button" onClick={onClose}>✕</button>
+          <h2 className="modal-title-row">
+            <IconSettings className="title-icon" />
+            <span>模型设置</span>
+          </h2>
+          <button className="close-button" onClick={onClose}>
+            <IconClose />
+          </button>
         </div>
 
         <div className="modal-body">
           {/* 指导提示 - 只在有模型且不在添加状态时显示 */}
           {models.length > 0 && !isAddingNew && (
             <div className="model-list-guidance">
-              <span className="guidance-icon">💡</span>
+              <span className="guidance-icon"><IconBulb /></span>
               <span className="guidance-text">点击 <span className="guidance-check">✓</span> 按钮选择默认模型，只能选择一个。</span>
             </div>
           )}
@@ -132,9 +147,15 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
             <div className="models-list">
               {models.length === 0 ? (
                 <div className="empty-state">
-                  <p>🌟 还没有配置任何模型</p>
-                  <p className="empty-hint">点击下方"➕ 添加新模型"按钮开始配置！</p>
-                  <p className="empty-hint">💡 提示：选中的模型将作为默认聊天模型。</p>
+                  <p className="empty-title">
+                    <IconSparkles className="empty-icon" />
+                    <span>还没有配置任何模型</span>
+                  </p>
+                  <p className="empty-hint">点击下方“添加新模型”按钮开始配置！</p>
+                  <p className="empty-hint">
+                    <IconBulb className="empty-hint-icon" />
+                    <span>提示：选中的模型将作为默认聊天模型。</span>
+                  </p>
                 </div>
               ) : (
                 models.map((model) => (
@@ -143,6 +164,11 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
                     className={`model-card ${model.isDefault ? 'active-default' : 'inactive'}`}
                     data-platform={model.platform}
                   >
+                    {model.isDefault && (
+                      <span className="default-corner-icon" aria-label="默认模型">
+                        <IconStar />
+                      </span>
+                    )}
                     <div className="model-header">
                       <div className="model-info">
                         <div className="model-icon">{getPlatformIcon(model.platform)}</div>
@@ -175,7 +201,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
                           onClick={() => handleDeleteModel(model.id)}
                           title="删除模型"
                         >
-                          <span className="delete-icon">✕</span>
+                          <span className="delete-icon"><IconTrash /></span>
                         </button>
                       </div>
                     </div>
@@ -193,17 +219,33 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
 
               <div className="form-group">
                 <label>平台类型</label>
-                <select
-                  value={newModel.platform}
-                  onChange={(e) => setNewModel({ ...newModel, platform: e.target.value })}
-                  className="form-select"
-                >
-                  {PLATFORM_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="platform-picker" aria-label="选择平台类型">
+                  {PLATFORM_OPTIONS.map((option) => {
+                    const isSelected = newModel.platform === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`platform-option-card ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setNewModel({ ...newModel, platform: option.value })}
+                        aria-pressed={isSelected}
+                      >
+                        <span className="platform-option-icon">
+                          <PlatformBadge platform={option.value} />
+                        </span>
+                        <span className="platform-option-texts">
+                          <span className="platform-option-label">{option.label}</span>
+                          <span className="platform-option-value">{option.value}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="platform-picker-summary">
+                  <span className="platform-picker-summary-label">当前选择</span>
+                  <span className="platform-picker-summary-value">{selectedPlatformOption.label}</span>
+                </div>
               </div>
 
               <div className="form-group">
@@ -242,7 +284,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
           {/* Add Button */}
           {!isAddingNew && (
             <button className="add-model-button" onClick={() => setIsAddingNew(true)}>
-              ➕ 添加新模型
+              <IconPlus className="add-model-icon" />
+              <span>添加新模型</span>
             </button>
           )}
         </div>

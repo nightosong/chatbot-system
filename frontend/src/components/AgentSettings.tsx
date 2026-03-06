@@ -3,6 +3,16 @@ import './AgentSettings.css';
 import { agentConfigService } from '../services/agentConfig';
 import { getAgentSkills, loadAgentSkill } from '../services/api';
 import { AgentConfig, AgentSkill } from '../types';
+import {
+  IconBot,
+  IconBulb,
+  IconClose,
+  IconCode,
+  IconCpu,
+  IconFolder,
+  IconSettings,
+  IconSparkles,
+} from './icons/AppIcons';
 
 interface AgentSettingsProps {
   onClose: () => void;
@@ -19,6 +29,9 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [loadedSkills, setLoadedSkills] = useState<AgentSkill[]>([]);
+  const [expandedSkillNames, setExpandedSkillNames] = useState<string[]>([]);
+
+  const enabledSkillNames = config.selected_skills ?? loadedSkills.map((skill) => skill.name);
 
   useEffect(() => {
     const fetchSkills = async () => {
@@ -31,6 +44,17 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
     };
     fetchSkills();
   }, []);
+
+  useEffect(() => {
+    if (loadedSkills.length === 0 || config.selected_skills !== undefined) {
+      return;
+    }
+
+    setConfig((currentConfig) => ({
+      ...currentConfig,
+      selected_skills: loadedSkills.map((skill) => skill.name),
+    }));
+  }, [config.selected_skills, loadedSkills]);
 
   const handleMcpConfigChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -111,6 +135,18 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
       const result = await loadAgentSkill(githubUrl.trim(), true);
       const refreshed = await getAgentSkills();
       setLoadedSkills(refreshed.skills);
+      setConfig((currentConfig) => {
+        if (currentConfig.selected_skills === undefined) {
+          return currentConfig;
+        }
+
+        const existingNames = new Set(currentConfig.selected_skills);
+        result.loaded_skills.forEach((name) => existingNames.add(name));
+        return {
+          ...currentConfig,
+          selected_skills: Array.from(existingNames),
+        };
+      });
       
       setMessage({ 
         type: 'success', 
@@ -131,35 +167,79 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
     }
   };
 
+  const handleToggleSkill = (skillName: string) => {
+    const enabledSkillNameSet = new Set(enabledSkillNames);
+
+    if (enabledSkillNameSet.has(skillName)) {
+      enabledSkillNameSet.delete(skillName);
+    } else {
+      enabledSkillNameSet.add(skillName);
+    }
+
+    setConfig({
+      ...config,
+      selected_skills: loadedSkills
+        .map((skill) => skill.name)
+        .filter((name) => enabledSkillNameSet.has(name)),
+    });
+  };
+
+  const handleToggleSkillExpanded = (skillName: string) => {
+    setExpandedSkillNames((currentNames) => (
+      currentNames.includes(skillName)
+        ? currentNames.filter((name) => name !== skillName)
+        : [...currentNames, skillName]
+    ));
+  };
+
   return (
     <div className="agent-settings-overlay" onClick={onClose}>
       <div className="agent-settings-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="agent-settings-header">
-          <h2>🤖 Agent 设置</h2>
-          <button className="close-button" onClick={onClose}>✕</button>
+          <h2 className="agent-settings-title">
+            <span className="agent-settings-title-icon"><IconBot /></span>
+            <span className="agent-settings-title-copy">
+              <span>Agent 设置</span>
+              <small>统一配置 MCP、Skills 与执行策略</small>
+            </span>
+          </h2>
+          <button className="close-button" onClick={onClose}>
+            <IconClose />
+          </button>
         </div>
 
         <div className="agent-settings-content">
+          <div className="agent-settings-guidance">
+            <span className="guidance-icon"><IconBulb /></span>
+            <span className="guidance-text">建议优先开启常用能力，再按需增加 MCP 配置和自定义 Skills。</span>
+          </div>
+
           {/* MCP Server 配置 */}
           <section className="settings-section">
-            <h3>🔧 MCP Server 配置</h3>
+            <h3 className="section-title">
+              <span className="section-title-icon"><IconCpu /></span>
+              <span>MCP Server 配置</span>
+            </h3>
             <div className="setting-item">
-              <label className="setting-label">
-                <input
-                  type="checkbox"
-                  checked={config.enable_mcp}
-                  onChange={(e) => setConfig({ ...config, enable_mcp: e.target.checked })}
-                />
-                <span>启用 MCP 工具</span>
+              <label className={`setting-toggle-card ${config.enable_mcp ? 'enabled' : ''}`}>
+                <span className="setting-toggle-copy">
+                  <span className="setting-toggle-title">启用 MCP 工具</span>
+                  <span className="setting-toggle-description">启用后可连接 Model Context Protocol 工具与外部服务。</span>
+                </span>
+                <span className="setting-toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={config.enable_mcp}
+                    onChange={(e) => setConfig({ ...config, enable_mcp: e.target.checked })}
+                  />
+                  <span className="setting-toggle-slider" />
+                </span>
               </label>
-              <p className="setting-description">
-                启用后可以使用 Model Context Protocol 工具
-              </p>
             </div>
 
             <div className="setting-item">
-              <label className="setting-label-text">
-                MCP Servers 配置 (JSON)
+              <label className="setting-label-text setting-label-row">
+                <span>MCP Servers 配置 (JSON)</span>
                 {jsonError && <span className="json-error-inline"> ⚠️ {jsonError}</span>}
               </label>
               <textarea
@@ -178,19 +258,25 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
 
           {/* Skills 配置 */}
           <section className="settings-section">
-            <h3>⚡ Skills 配置</h3>
+            <h3 className="section-title">
+              <span className="section-title-icon"><IconSparkles /></span>
+              <span>Skills 配置</span>
+            </h3>
             <div className="setting-item">
-              <label className="setting-label">
-                <input
-                  type="checkbox"
-                  checked={config.enable_skills}
-                  onChange={(e) => setConfig({ ...config, enable_skills: e.target.checked })}
-                />
-                <span>启用自定义 Skills</span>
+              <label className={`setting-toggle-card ${config.enable_skills ? 'enabled' : ''}`}>
+                <span className="setting-toggle-copy">
+                  <span className="setting-toggle-title">启用自定义 Skills</span>
+                  <span className="setting-toggle-description">启用后可加载文件操作、代码执行、数据分析等扩展能力。</span>
+                </span>
+                <span className="setting-toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={config.enable_skills}
+                    onChange={(e) => setConfig({ ...config, enable_skills: e.target.checked })}
+                  />
+                  <span className="setting-toggle-slider" />
+                </span>
               </label>
-              <p className="setting-description">
-                启用后可以使用文件操作、代码执行、数据分析等技能
-              </p>
             </div>
 
             <div className="setting-item">
@@ -211,7 +297,10 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
 
           {/* GitHub Skill 加载 */}
           <section className="settings-section">
-            <h3>📦 从 GitHub 加载 Skill</h3>
+            <h3 className="section-title">
+              <span className="section-title-icon"><IconFolder /></span>
+              <span>从 GitHub 加载 Skill</span>
+            </h3>
             <div className="setting-item">
               <label className="setting-label-text">GitHub Repository URL</label>
               <div className="github-input-group">
@@ -237,7 +326,10 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
             </div>
 
             <div className="skill-examples">
-              <p className="examples-title">示例 Skill 仓库：</p>
+              <p className="examples-title">
+                <IconCode className="examples-title-icon" />
+                <span>示例 Skill 仓库</span>
+              </p>
               <ul className="examples-list">
                 <li>
                   <code>github.com/example/weather-skill</code>
@@ -255,15 +347,48 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
             </div>
 
             <div className="skill-examples">
-              <p className="examples-title">当前已加载 Skills（{loadedSkills.length}）</p>
+              <p className="examples-title">
+                <IconSettings className="examples-title-icon" />
+                <span>当前已加载 Skills（{loadedSkills.length}）</span>
+              </p>
               {loadedSkills.length > 0 ? (
-                <ul className="examples-list">
+                <ul className="loaded-skills-list">
                   {loadedSkills.map((skill) => (
-                    <li key={skill.name}>
-                      <code>{skill.name}</code>
-                      <span className="example-desc">
-                        {` - ${skill.source === 'builtin' ? '内置' : '动态'}: ${skill.description}`}
-                      </span>
+                    <li
+                      key={skill.name}
+                      className={`loaded-skill-item ${enabledSkillNames.includes(skill.name) ? 'enabled' : ''} ${expandedSkillNames.includes(skill.name) ? 'expanded' : ''}`}
+                    >
+                      <div className="loaded-skill-row">
+                        <div className="loaded-skill-main">
+                          <div className="loaded-skill-header">
+                            <span className="loaded-skill-name">{skill.name}</span>
+                            <span className="loaded-skill-source">
+                            {skill.source === 'builtin' ? '内置 Skill' : '动态 Skill'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="loaded-skill-expand"
+                            onClick={() => handleToggleSkillExpanded(skill.name)}
+                          >
+                            {expandedSkillNames.includes(skill.name) ? '收起说明' : '查看说明'}
+                          </button>
+                        </div>
+                        <label className="loaded-skill-toggle">
+                          <input
+                            type="checkbox"
+                            checked={enabledSkillNames.includes(skill.name)}
+                            onChange={() => handleToggleSkill(skill.name)}
+                            disabled={!config.enable_skills}
+                          />
+                          <span className="loaded-skill-checkmark" />
+                        </label>
+                      </div>
+                      {expandedSkillNames.includes(skill.name) && (
+                        <div className="loaded-skill-description-wrap">
+                          <p className="loaded-skill-description">{skill.description}</p>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -282,16 +407,10 @@ const AgentSettings: React.FC<AgentSettingsProps> = ({ onClose }) => {
         </div>
 
         <div className="agent-settings-footer">
-          <button className="reset-button" onClick={handleReset}>
-            🔄 重置默认
-          </button>
+          <button className="reset-button" onClick={handleReset}>重置</button>
           <div className="footer-buttons">
-            <button className="cancel-button" onClick={onClose}>
-              取消
-            </button>
-            <button className="save-button" onClick={handleSave}>
-              💾 保存配置
-            </button>
+            <button className="cancel-button" onClick={onClose}>关闭</button>
+            <button className="save-button" onClick={handleSave}>保存</button>
           </div>
         </div>
       </div>

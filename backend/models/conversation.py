@@ -49,6 +49,7 @@ class AgentConfig(BaseModel):
     """Agent mode configuration"""
     enable_mcp: bool = True
     enable_skills: bool = True
+    selected_skills: Optional[List[str]] = None
     mcp_servers: Optional[dict] = None  # {"ServerName": {"url": "...", "transport": "sse"}}
     max_iterations: int = 10
 
@@ -79,4 +80,3 @@ class PermissionRule(BaseModel):
     tool: str  # Tool name (read, write, edit, bash, etc.)
     pattern: str  # Pattern to match (supports wildcards)
     action: str  # Action to take: allow, deny, ask
-

@@ -1,188 +1,93 @@
-/* OpenAI Logo */
-.platform-icon-openai {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
+.platform-badge {
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 1.2rem;
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  transition: all 0.24s ease;
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-.platform-icon-openai::before {
-  content: 'GPT';
-  font-size: 0.65rem;
-  letter-spacing: 0.5px;
+.platform-badge svg {
+  width: 18px;
+  height: 18px;
 }
 
-/* Google Gemini */
-.platform-icon-gemini {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc04 75%, #ea4335 100%);
+.platform-badge.has-official-icon {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.platform-badge-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.platform-badge-image-skywork {
+  transform: scale(1.18);
+  transform-origin: center;
+}
+
+.platform-badge-image-doubao {
+  transform: scale(1.08);
+  transform-origin: center;
+}
+
+.platform-badge-openai {
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+}
+
+.platform-badge-gemini {
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
 }
 
-.platform-icon-gemini::before {
-  content: '◆';
-  font-size: 1.4rem;
-  color: white;
-  animation: gemini-rotate 3s linear infinite;
+.platform-badge-skywork {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
 }
 
-@keyframes gemini-rotate {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(180deg); }
-}
-
-/* Skywork Router */
-.platform-icon-skywork {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.platform-icon-skywork::before {
-  content: 'S';
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-/* Moonshot Kimi */
-.platform-icon-kimi {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+.platform-badge-kimi {
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
 }
 
-.platform-icon-kimi::before {
-  content: '🌙';
-  font-size: 1.2rem;
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.8));
+.platform-badge-qwen {
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
 }
 
-/* Alibaba Qwen */
-.platform-icon-qwen {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: white;
+.platform-badge-deepseek {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
 }
 
-.platform-icon-qwen::before {
-  content: '通';
-  font-size: 1.1rem;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+.platform-badge-claude {
+  background: linear-gradient(135deg, #92400e 0%, #d97706 100%);
 }
 
-/* DeepSeek */
-.platform-icon-deepseek {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.platform-icon-deepseek::before {
-  content: 'DS';
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 1px;
-}
-
-/* Anthropic Claude */
-.platform-icon-claude {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #d97706 0%, #ea580c 100%);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.platform-icon-claude::before {
-  content: 'C';
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: white;
-  font-family: Georgia, serif;
-  font-style: italic;
-}
-
-/* ByteDance Doubao */
-.platform-icon-doubao {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+.platform-badge-doubao {
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: white;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
 }
 
-.platform-icon-doubao::before {
-  content: '豆';
-  font-size: 1.1rem;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+.model-card:hover .platform-badge {
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
 }
 
-/* 通用平台图标容器样式 */
-.platform-icon {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+.model-card:hover .platform-badge.has-official-icon {
+  filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.25));
 }
 
-.model-card:hover .platform-icon {
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+.model-card.active-default .platform-badge {
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.34), 0 4px 14px rgba(255, 215, 0, 0.38);
 }
 
-.model-card.active-default .platform-icon {
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5);
-  animation: icon-glow 2s ease-in-out infinite;
-}
-
-@keyframes icon-glow {
-  0%, 100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.2);
-  }
+.model-card.active-default .platform-badge.has-official-icon {
+  box-shadow: none;
+  filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)) drop-shadow(0 2px 8px rgba(255, 196, 0, 0.5));
 }

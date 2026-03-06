@@ -68,10 +68,20 @@
   text-shadow: 0 2px 4px rgba(255, 105, 180, 0.2);
 }
 
+.modal-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .close-button {
   background: transparent;
   border: none;
-  font-size: 1.5rem;
   color: #ff69b4;
   cursor: pointer;
   width: 32px;
@@ -86,6 +96,11 @@
 .close-button:hover {
   background: rgba(255, 105, 180, 0.1);
   transform: rotate(90deg);
+}
+
+.close-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .modal-body {
@@ -124,8 +139,15 @@
 }
 
 .guidance-icon {
-  font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+}
+
+.guidance-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .guidance-text {
@@ -161,9 +183,27 @@
   font-size: 1.1rem;
 }
 
+.empty-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.empty-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .empty-hint {
   font-size: 0.9rem !important;
   opacity: 0.8;
+}
+
+.empty-hint-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 0.25rem;
+  vertical-align: -2px;
 }
 
 .model-card {
@@ -176,45 +216,10 @@
   min-height: fit-content;
 }
 
-.model-card.default {
-  border: 2px solid rgba(255, 215, 0, 0.6);
-  background: linear-gradient(135deg, rgba(255, 250, 205, 0.8) 0%, rgba(255, 248, 220, 0.8) 100%);
-  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
-}
-
-.model-card.default::before {
-  content: '⭐';
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 1.2rem;
-  opacity: 0.6;
-  animation: sparkle-default 2s ease-in-out infinite;
-}
-
-@keyframes sparkle-default {
-
-  0%,
-  100% {
-    opacity: 0.4;
-    transform: scale(1) rotate(0deg);
-  }
-
-  50% {
-    opacity: 0.8;
-    transform: scale(1.2) rotate(180deg);
-  }
-}
-
 .model-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(255, 105, 180, 0.2);
   border-color: rgba(255, 105, 180, 0.4);
-}
-
-.model-card.default:hover {
-  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
-  border-color: rgba(255, 215, 0, 0.8);
 }
 
 .model-card.disabled {
@@ -245,6 +250,27 @@
   opacity: 1;
   filter: none;
   transform: scale(1.02);
+}
+
+.default-corner-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffb100;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 215, 0, 0.7);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(255, 215, 0, 0.35);
+}
+
+.default-corner-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
 .model-card.active-default:hover {
@@ -336,8 +362,8 @@
 }
 
 .model-card .platform-icon {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
 }
 
 .model-actions {
@@ -489,11 +515,15 @@
 
 /* 删除图标样式 */
 .delete-button .delete-icon {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.3s ease;
-  display: block;
+}
+
+.delete-button .delete-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* 添加可爱的心形装饰 */
@@ -656,6 +686,90 @@
   font-family: inherit;
 }
 
+.platform-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.platform-option-card {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 2px solid rgba(255, 182, 193, 0.28);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.platform-option-card:hover {
+  border-color: rgba(255, 105, 180, 0.48);
+  box-shadow: 0 8px 18px rgba(255, 105, 180, 0.12);
+  transform: translateY(-1px);
+}
+
+.platform-option-card.selected {
+  border-color: #ff69b4;
+  background: linear-gradient(135deg, rgba(255, 245, 250, 0.98) 0%, rgba(241, 248, 255, 0.98) 100%);
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.12), 0 10px 22px rgba(255, 105, 180, 0.18);
+}
+
+.platform-option-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.platform-option-texts {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.platform-option-label {
+  color: #ff69b4;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.platform-option-value {
+  color: #ff9a9e;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.platform-picker-summary {
+  margin-top: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 182, 193, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.platform-picker-summary-label {
+  color: #ff9a9e;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.platform-picker-summary-value {
+  color: #ff69b4;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
 .form-input:focus,
 .form-select:focus {
   outline: none;
@@ -718,6 +832,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
 }
 
 .add-model-button:hover {
@@ -725,6 +843,11 @@
   border-color: #ff69b4;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 105, 180, 0.2);
+}
+
+.add-model-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Scrollbar styling for modal */
@@ -792,6 +915,10 @@
 
   .form-actions {
     flex-direction: column;
+  }
+
+  .platform-picker {
+    grid-template-columns: 1fr;
   }
 
   .btn {

@@ -48,18 +48,76 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
             return str(value)
 
 
-    def _block_network():
-        def _raise(*args, **kwargs):
-            raise RuntimeError("Network access is disabled in skill sandbox")
+    # Base allowlist: LLM API endpoints that skills may always reach.
+    _ALLOWED_HOSTS = {
+        "api.openai.com",
+        "api.deepseek.com",
+        "api.moonshot.cn",
+        "dashscope.aliyuncs.com",
+        "generativelanguage.googleapis.com",
+        "gpt-us.singularity-ai.com",
+        "api.anthropic.com",
+    }
 
-        socket.create_connection = _raise
-        socket.getaddrinfo = _raise
+    def _build_network_filter(payload):
+        # Build the effective allowed-host set from the static base list plus
+        # any MCP server hostnames found in payload["mcp_config"].
+        import urllib.parse
+        allowed = set(_ALLOWED_HOSTS)
 
-        class _BlockedSocket:
-            def __init__(self, *args, **kwargs):
-                _raise()
+        mcp_cfg = payload.get("mcp_config") or {}
+        for key, val in mcp_cfg.items():
+            if key == "_meta" or not isinstance(val, dict):
+                continue
+            url = val.get("url", "")
+            if url:
+                try:
+                    parsed = urllib.parse.urlparse(url)
+                    host = parsed.hostname or ""
+                    if host:
+                        allowed.add(host)
+                except Exception:
+                    pass
+        return allowed
 
-        socket.socket = _BlockedSocket
+    def _block_network(allowed_hosts):
+        _orig_getaddrinfo = socket.getaddrinfo
+        _orig_create_connection = socket.create_connection
+        _orig_socket_class = socket.socket
+
+        def _check_host(host):
+            h = str(host)
+            # Always allow localhost / loopback for local MCP servers
+            if h in ("localhost", "127.0.0.1", "::1") or h in allowed_hosts:
+                return
+            raise RuntimeError(
+                f"Network access is disabled in skill sandbox (blocked host: {h}). "
+                f"Allowed hosts: LLM endpoints + configured MCP server hosts."
+            )
+
+        def _patched_getaddrinfo(host, *args, **kwargs):
+            _check_host(str(host))
+            return _orig_getaddrinfo(host, *args, **kwargs)
+
+        def _patched_create_connection(address, *args, **kwargs):
+            host = address[0] if isinstance(address, (tuple, list)) else address
+            _check_host(str(host))
+            return _orig_create_connection(address, *args, **kwargs)
+
+        class _FilteredSocket(_orig_socket_class):
+            def connect(self, address):
+                host = address[0] if isinstance(address, (tuple, list)) else address
+                _check_host(str(host))
+                return super().connect(address)
+
+            def connect_ex(self, address):
+                host = address[0] if isinstance(address, (tuple, list)) else address
+                _check_host(str(host))
+                return super().connect_ex(address)
+
+        socket.getaddrinfo = _patched_getaddrinfo
+        socket.create_connection = _patched_create_connection
+        socket.socket = _FilteredSocket
 
 
     def _load_module(module_path, module_name):
@@ -101,13 +159,16 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
         arguments = payload.get("arguments", {})
         scripts_dir = payload.get("scripts_dir")
 
-        _block_network()
+        allowed_hosts = _build_network_filter(payload)
+        _block_network(allowed_hosts)
 
         context = {
             "skill_dir": payload.get("skill_dir"),
             "instruction": payload.get("instruction", ""),
             "references_dir": payload.get("references_dir"),
             "assets_dir": payload.get("assets_dir"),
+            "llm_config": payload.get("llm_config"),   # LLM config for skill-internal LLM calls
+            "mcp_config": payload.get("mcp_config"),   # MCP servers config for skill-internal tool calls
         }
 
         script_file = _find_script(scripts_dir)
@@ -606,7 +667,13 @@ class SkillManager:
         if len(description) > 1024:
             raise ValueError("description must be <= 1024 characters")
 
-    async def execute_skill(self, skill_name: str, arguments: Dict[str, Any]) -> Any:
+    async def execute_skill(
+        self,
+        skill_name: str,
+        arguments: Dict[str, Any],
+        llm_config: Optional[Dict[str, Any]] = None,
+        mcp_config: Optional[Dict[str, Any]] = None,
+    ) -> Any:
         if arguments is None:
             arguments = {}
         if not isinstance(arguments, dict):
@@ -619,16 +686,25 @@ class SkillManager:
         if not skill:
             return {"error": f"Skill '{skill_name}' not found", "skill": skill_name}
 
-        return await self._execute_skill_in_sandbox(skill, arguments)
+        return await self._execute_skill_in_sandbox(
+            skill, arguments,
+            llm_config=llm_config,
+            mcp_config=mcp_config,
+        )
 
     async def _execute_skill_in_sandbox(
-        self, skill: Skill, arguments: Dict[str, Any]
+        self,
+        skill: Skill,
+        arguments: Dict[str, Any],
+        llm_config: Optional[Dict[str, Any]] = None,
+        mcp_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         skill_dir = str(skill.directory)
         timeout = int(
             arguments.pop("__timeout", os.getenv("SKILL_SANDBOX_TIMEOUT", "20"))
         )
-        timeout = max(3, min(timeout, 120))
+        # LLM/MCP calls inside skills may take longer; give extra headroom
+        timeout = max(3, min(timeout, 300))
 
         runner_code = self._build_sandbox_runner_code()
         payload = {
@@ -638,6 +714,8 @@ class SkillManager:
             "scripts_dir": str(skill.directory / "scripts"),
             "references_dir": str(skill.directory / "references"),
             "assets_dir": str(skill.directory / "assets"),
+            "llm_config": llm_config,   # Forward LLM config into sandbox context
+            "mcp_config": mcp_config,   # Forward MCP servers config into sandbox context
         }
 
         python_exec = os.getenv("SKILL_PYTHON_EXECUTABLE", "python3")

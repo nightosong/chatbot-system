@@ -78,6 +78,7 @@ export interface MCPConfigWithMeta {
 export interface AgentConfig {
   enable_mcp: boolean;
   enable_skills: boolean;
+  selected_skills?: string[];
   mcp_servers?: MCPConfigWithMeta | null;
   max_iterations: number;
 }

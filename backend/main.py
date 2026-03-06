@@ -361,6 +361,7 @@ async def agent_chat(request: AgentRequest):
                 language=request.language,
                 enable_mcp=agent_config.enable_mcp,
                 enable_skills=agent_config.enable_skills,
+                selected_skill_names=agent_config.selected_skills,
                 max_iterations=agent_config.max_iterations,
             ):
                 # Capture final messages for saving

@@ -869,3 +869,102 @@ httpx.RemoteProtocolError: peer closed connection without sending complete messa
 2026-03-06 09:35:53,509 | INFO     | ai_chat.backend | HTTP OPTIONS /api/conversations/6939ec40-5ce9-40f9-90f7-660345a7e2a8 status=200 ip=127.0.0.1 duration_ms=0.17
 2026-03-06 09:35:53,511 | INFO     | ai_chat.backend | HTTP DELETE /api/conversations/6939ec40-5ce9-40f9-90f7-660345a7e2a8 status=200 ip=127.0.0.1 duration_ms=1.42
 2026-03-06 09:35:53,525 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=1.19
+2026-03-06 09:57:27,821 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=7.29
+2026-03-06 09:57:27,825 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.42
+2026-03-06 09:57:35,061 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.49
+2026-03-06 09:57:35,063 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.47
+2026-03-06 10:15:47,039 | INFO     | ai_chat.backend | HTTP OPTIONS /api/agent/chat status=200 ip=127.0.0.1 duration_ms=0.92
+2026-03-06 10:15:47,076 | INFO     | ai_chat.backend | HTTP POST /api/agent/chat status=200 ip=127.0.0.1 duration_ms=32.96
+2026-03-06 10:15:48,649 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 10:15:50,053 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=db7fe0286de24caebe29e8786b1bb314 "HTTP/1.1 202 Accepted"
+2026-03-06 10:15:50,396 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=db7fe0286de24caebe29e8786b1bb314 "HTTP/1.1 202 Accepted"
+2026-03-06 10:15:50,742 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=db7fe0286de24caebe29e8786b1bb314 "HTTP/1.1 202 Accepted"
+2026-03-06 10:16:21,286 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=2.35
+2026-03-06 10:16:21,291 | INFO     | ai_chat.backend | HTTP GET /api/conversations/feee90c3-a3c5-4e60-a589-c28fd2b1f703 status=200 ip=127.0.0.1 duration_ms=1.59
+2026-03-06 10:20:46,987 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-06 10:20:47,024 | INFO     | ai_chat.backend | Loaded local skills on startup: count=2 names=academic-pptx,video-studio
+2026-03-06 10:20:52,734 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=4.86
+2026-03-06 10:20:52,743 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=3.55
+2026-03-06 10:20:52,870 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=1.72
+2026-03-06 10:20:52,872 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=1.02
+2026-03-06 11:01:53,194 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=4.35
+2026-03-06 11:01:53,196 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.44
+2026-03-06 11:07:04,872 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=3.00
+2026-03-06 11:07:04,877 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.41
+2026-03-06 11:09:06,895 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.38
+2026-03-06 11:09:06,898 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.25
+2026-03-06 11:10:31,348 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=6.97
+2026-03-06 11:11:07,904 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-06 11:11:07,944 | INFO     | ai_chat.backend | Loaded local skills on startup: count=2 names=academic-pptx,video-studio
+2026-03-06 11:11:14,234 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=9.83
+2026-03-06 11:11:14,237 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=1.17
+2026-03-06 11:11:22,228 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.03
+2026-03-06 11:11:22,230 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.34
+2026-03-06 11:12:04,596 | INFO     | ai_chat.backend | HTTP OPTIONS /api/agent/chat status=200 ip=127.0.0.1 duration_ms=3.68
+2026-03-06 11:12:04,607 | INFO     | ai_chat.backend | HTTP POST /api/agent/chat status=200 ip=127.0.0.1 duration_ms=7.57
+2026-03-06 11:12:06,235 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:12:07,649 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=e5002940837640ec8b38173c6c4c32dd "HTTP/1.1 202 Accepted"
+2026-03-06 11:12:07,993 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=e5002940837640ec8b38173c6c4c32dd "HTTP/1.1 202 Accepted"
+2026-03-06 11:12:08,330 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=e5002940837640ec8b38173c6c4c32dd "HTTP/1.1 202 Accepted"
+2026-03-06 11:12:35,088 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=2.57
+2026-03-06 11:12:35,090 | INFO     | ai_chat.backend | HTTP GET /api/conversations/898c5fdf-2b61-4509-81e4-d571e51b7284 status=200 ip=127.0.0.1 duration_ms=1.25
+2026-03-06 11:14:42,429 | INFO     | ai_chat.backend | HTTP POST /api/agent/chat status=200 ip=127.0.0.1 duration_ms=8.99
+2026-03-06 11:14:44,044 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:14:45,454 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3e1159710ed4127b554a43f91d4d34a "HTTP/1.1 202 Accepted"
+2026-03-06 11:14:45,812 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3e1159710ed4127b554a43f91d4d34a "HTTP/1.1 202 Accepted"
+2026-03-06 11:14:46,156 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3e1159710ed4127b554a43f91d4d34a "HTTP/1.1 202 Accepted"
+2026-03-06 11:15:19,329 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:15:20,790 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=053b3f213ac34a789dc0f16f02636f56 "HTTP/1.1 202 Accepted"
+2026-03-06 11:15:21,145 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=053b3f213ac34a789dc0f16f02636f56 "HTTP/1.1 202 Accepted"
+2026-03-06 11:15:21,498 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=053b3f213ac34a789dc0f16f02636f56 "HTTP/1.1 202 Accepted"
+2026-03-06 11:17:32,863 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:17:34,504 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=3468773247a6443284739acaffbe2bb0 "HTTP/1.1 202 Accepted"
+2026-03-06 11:17:34,849 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=3468773247a6443284739acaffbe2bb0 "HTTP/1.1 202 Accepted"
+2026-03-06 11:17:35,192 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=3468773247a6443284739acaffbe2bb0 "HTTP/1.1 202 Accepted"
+2026-03-06 11:20:31,875 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:20:33,298 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=ef9b2ede8f4d4b9c9339d68c1bd983fb "HTTP/1.1 202 Accepted"
+2026-03-06 11:20:33,656 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=ef9b2ede8f4d4b9c9339d68c1bd983fb "HTTP/1.1 202 Accepted"
+2026-03-06 11:20:34,007 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=ef9b2ede8f4d4b9c9339d68c1bd983fb "HTTP/1.1 202 Accepted"
+2026-03-06 11:22:44,696 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:22:46,149 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3d6e612d6604a8e82238b61f890a599 "HTTP/1.1 202 Accepted"
+2026-03-06 11:22:46,513 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3d6e612d6604a8e82238b61f890a599 "HTTP/1.1 202 Accepted"
+2026-03-06 11:22:46,865 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d3d6e612d6604a8e82238b61f890a599 "HTTP/1.1 202 Accepted"
+2026-03-06 11:25:21,333 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:25:22,758 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=f8cc4118aeb34576a2482fa09ef31629 "HTTP/1.1 202 Accepted"
+2026-03-06 11:25:23,111 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=f8cc4118aeb34576a2482fa09ef31629 "HTTP/1.1 202 Accepted"
+2026-03-06 11:25:23,457 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=f8cc4118aeb34576a2482fa09ef31629 "HTTP/1.1 202 Accepted"
+2026-03-06 11:28:14,714 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:28:16,177 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=abc0117dc3114dc0b8bd6a38b0e95c58 "HTTP/1.1 202 Accepted"
+2026-03-06 11:28:16,525 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=abc0117dc3114dc0b8bd6a38b0e95c58 "HTTP/1.1 202 Accepted"
+2026-03-06 11:28:16,935 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=abc0117dc3114dc0b8bd6a38b0e95c58 "HTTP/1.1 202 Accepted"
+2026-03-06 11:28:48,765 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=15.25
+2026-03-06 11:28:48,774 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=2.39
+2026-03-06 11:31:05,883 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:31:07,476 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d9f6954836ce46d2a44e87e56aad9d93 "HTTP/1.1 202 Accepted"
+2026-03-06 11:31:07,838 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d9f6954836ce46d2a44e87e56aad9d93 "HTTP/1.1 202 Accepted"
+2026-03-06 11:31:08,192 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=d9f6954836ce46d2a44e87e56aad9d93 "HTTP/1.1 202 Accepted"
+2026-03-06 11:31:30,519 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:31:31,921 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=7602ed9dcd1f48deafb60edbffb6c8c6 "HTTP/1.1 202 Accepted"
+2026-03-06 11:31:32,274 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=7602ed9dcd1f48deafb60edbffb6c8c6 "HTTP/1.1 202 Accepted"
+2026-03-06 11:31:32,619 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=7602ed9dcd1f48deafb60edbffb6c8c6 "HTTP/1.1 202 Accepted"
+2026-03-06 11:32:56,069 | INFO     | httpx | HTTP Request: GET https://video-mcpserver-test.skywork.ai/sse "HTTP/1.1 200 OK"
+2026-03-06 11:32:57,939 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=2dde225636dd409e9a07fa011c6e573f "HTTP/1.1 202 Accepted"
+2026-03-06 11:32:58,374 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=2dde225636dd409e9a07fa011c6e573f "HTTP/1.1 202 Accepted"
+2026-03-06 11:32:58,729 | INFO     | httpx | HTTP Request: POST https://video-mcpserver-test.skywork.ai/messages/?session_id=2dde225636dd409e9a07fa011c6e573f "HTTP/1.1 202 Accepted"
+2026-03-06 11:33:53,623 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=7.51
+2026-03-06 11:33:53,626 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=0.91
+2026-03-06 11:39:46,331 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=2.62
+2026-03-06 11:39:46,334 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.30
+2026-03-06 11:42:24,319 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=8.90
+2026-03-06 11:42:24,320 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=9.71
+2026-03-06 11:43:15,850 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.49
+2026-03-06 11:43:15,853 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.80
+2026-03-06 11:47:49,282 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.91
+2026-03-06 11:47:49,284 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.27
+2026-03-06 11:50:17,179 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=5.22
+2026-03-06 11:50:17,182 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.20
+2026-03-06 11:54:07,617 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=1.10
+2026-03-06 11:56:10,007 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=3.70
+2026-03-06 11:56:10,010 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.25
+2026-03-06 11:56:14,356 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.58
+2026-03-06 11:56:14,358 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.62

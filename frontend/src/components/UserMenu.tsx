@@ -5,6 +5,14 @@ import LanguageSettings from './LanguageSettings';
 import AgentSettings from './AgentSettings';
 import AboutDialog from './AboutDialog';
 import LogViewer from './LogViewer';
+import {
+  IconBot,
+  IconGlobe,
+  IconInfoCircle,
+  IconScroll,
+  IconSettings,
+  IconUserCircle,
+} from './icons/AppIcons';
 
 const UserMenu: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -66,41 +74,31 @@ const UserMenu: React.FC = () => {
       <div className="user-menu-container" ref={menuRef}>
         <button className="avatar-button" onClick={handleMenuToggle}>
           <div className="avatar">
-            <div className="avatar-face">
-              <div className="avatar-eyes">
-                <span className="eye">•</span>
-                <span className="eye">•</span>
-              </div>
-              <div className="avatar-mouth">ω</div>
-            </div>
-            <div className="avatar-sparkles">
-              <span className="sparkle sparkle-1">✨</span>
-              <span className="sparkle sparkle-2">💕</span>
-            </div>
+            <IconUserCircle className="avatar-icon" size={26} />
           </div>
         </button>
 
         {isMenuOpen && (
           <div className="dropdown-menu">
             <div className="menu-item" onClick={handleSettingsClick}>
-              <span className="menu-icon">⚙️</span>
+              <span className="menu-icon"><IconSettings /></span>
               <span className="menu-text">模型设置</span>
             </div>
             <div className="menu-item" onClick={handleLanguageClick}>
-              <span className="menu-icon">🌐</span>
+              <span className="menu-icon"><IconGlobe /></span>
               <span className="menu-text">语言设置</span>
             </div>
             <div className="menu-item" onClick={handleAgentSettingsClick}>
-              <span className="menu-icon">🤖</span>
+              <span className="menu-icon"><IconBot /></span>
               <span className="menu-text">Agent 设置</span>
             </div>
             <div className="menu-item" onClick={handleLogViewerClick}>
-              <span className="menu-icon">📜</span>
+              <span className="menu-icon"><IconScroll /></span>
               <span className="menu-text">日志浏览</span>
             </div>
             <div className="menu-divider"></div>
             <div className="menu-item" onClick={handleAboutClick}>
-              <span className="menu-icon">ℹ️</span>
+              <span className="menu-icon"><IconInfoCircle /></span>
               <span className="menu-text">关于</span>
             </div>
           </div>

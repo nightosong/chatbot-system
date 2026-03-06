@@ -35,6 +35,9 @@ class AgentService:
         """
         self.mcp_client = mcp_client
         self.skill_manager = skill_manager
+        # Set during generate_stream so _execute_tool can forward them to skills
+        self._current_model_config: Optional[Dict[str, Any]] = None
+        self._current_mcp_config: Optional[Dict[str, Any]] = None
         self._default_system_prompt = self._load_default_system_prompt()
 
     def _load_default_system_prompt(self) -> str:
@@ -189,6 +192,7 @@ class AgentService:
         language: Optional[str] = None,
         enable_mcp: bool = True,
         enable_skills: bool = True,
+        selected_skill_names: Optional[List[str]] = None,
         max_iterations: int = 10,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
@@ -229,6 +233,13 @@ class AgentService:
             if not api_key or not model_name:
                 raise ValueError("API key and model name are required")
 
+            # Store for use in _execute_tool so skills receive LLM + MCP configs
+            self._current_model_config = model_config
+            # mcp_client.servers_config holds the full mcp_servers dict (including _meta)
+            self._current_mcp_config = (
+                self.mcp_client.servers_config if self.mcp_client else None
+            )
+
             # Get available tools
             tools = []
             if enable_mcp and self.mcp_client:
@@ -237,9 +248,21 @@ class AgentService:
 
             skill_summaries: List[Dict[str, Any]] = []
             if enable_skills and self.skill_manager:
+                selected_skill_name_set = set(selected_skill_names or [])
                 skill_tools = self.skill_manager.get_tools()
-                tools.extend(skill_tools)
                 skill_summaries = self.skill_manager.list_skills()
+
+                if selected_skill_name_set:
+                    skill_tools = [
+                        tool for tool in skill_tools
+                        if tool.get("function", {}).get("name") in selected_skill_name_set
+                    ]
+                    skill_summaries = [
+                        skill for skill in skill_summaries
+                        if skill.get("name") in selected_skill_name_set
+                    ]
+
+                tools.extend(skill_tools)
 
             tools = self._deduplicate_tools(tools)
 
@@ -747,9 +770,14 @@ class AgentService:
         # Try custom skills first (skills have priority)
         if self.skill_manager and self.skill_manager.has_skill(tool_name):
             try:
-                # Execute skill with the provided arguments
-                # The skill_manager handles parameter validation and sandbox execution
-                result = await self.skill_manager.execute_skill(tool_name, tool_args)
+                # Execute skill with the provided arguments.
+                # Pass current model_config so skills can make LLM calls internally.
+                result = await self.skill_manager.execute_skill(
+                    tool_name,
+                    tool_args,
+                    llm_config=self._current_model_config,
+                    mcp_config=self._current_mcp_config,
+                )
                 return result
             except Exception as e:
                 # If skill execution fails, return detailed error

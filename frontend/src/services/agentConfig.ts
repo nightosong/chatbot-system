@@ -41,6 +41,7 @@ class AgentConfigService {
     return {
       enable_mcp: true,
       enable_skills: true,
+      selected_skills: undefined,
       mcp_servers: null,
       max_iterations: 10,
     };
