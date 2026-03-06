@@ -208,7 +208,8 @@
 
 /* 添加可爱的心形装饰 */
 .delete-btn::before {
-  content: '💔';
+  content: '';
+  display: none;
   position: absolute;
   top: -8px;
   right: -8px;
@@ -245,9 +246,9 @@
 }
 
 .delete-btn:hover::before {
-  opacity: 1;
-  transform: scale(1) rotate(0deg);
-  animation: float-heart 2s ease-in-out infinite;
+  opacity: 0;
+  transform: scale(0) rotate(0deg);
+  animation: none;
 }
 
 .delete-btn:hover::after {
