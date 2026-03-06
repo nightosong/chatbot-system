@@ -61,10 +61,12 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
 
     def _build_network_filter(payload):
         # Build the effective allowed-host set from the static base list plus
-        # any MCP server hostnames found in payload["mcp_config"].
+        # any MCP server hostnames found in payload["mcp_config"] and
+        # LLM base_url from payload["llm_config"].
         import urllib.parse
         allowed = set(_ALLOWED_HOSTS)
 
+        # Add MCP server hosts
         mcp_cfg = payload.get("mcp_config") or {}
         for key, val in mcp_cfg.items():
             if key == "_meta" or not isinstance(val, dict):
@@ -78,17 +80,48 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
                         allowed.add(host)
                 except Exception:
                     pass
+
+        # Add LLM base_url host (important for custom LLM endpoints)
+        llm_cfg = payload.get("llm_config") or {}
+        base_url = llm_cfg.get("base_url", "")
+        if base_url:
+            try:
+                parsed = urllib.parse.urlparse(base_url)
+                host = parsed.hostname or ""
+                # Debug: print what we extracted
+                print(f"[SANDBOX DEBUG] base_url={base_url}, parsed.hostname={host}", file=sys.stderr)
+                if host:
+                    allowed.add(host)
+            except Exception as e:
+                print(f"[SANDBOX DEBUG] Failed to parse base_url: {e}", file=sys.stderr)
+                pass
+
+        # Debug: print final allowed hosts
+        print(f"[SANDBOX DEBUG] Final allowed hosts: {allowed}", file=sys.stderr)
+
         return allowed
 
     def _block_network(allowed_hosts):
         _orig_getaddrinfo = socket.getaddrinfo
         _orig_create_connection = socket.create_connection
         _orig_socket_class = socket.socket
+        _allowed_ips = set()
+
+        def _remember_resolved_ips(addrinfo_result):
+            for item in addrinfo_result:
+                try:
+                    sockaddr = item[4]
+                    if isinstance(sockaddr, (tuple, list)) and sockaddr:
+                        ip = str(sockaddr[0])
+                        if ip:
+                            _allowed_ips.add(ip)
+                except Exception:
+                    pass
 
         def _check_host(host):
             h = str(host)
             # Always allow localhost / loopback for local MCP servers
-            if h in ("localhost", "127.0.0.1", "::1") or h in allowed_hosts:
+            if h in ("localhost", "127.0.0.1", "::1") or h in allowed_hosts or h in _allowed_ips:
                 return
             raise RuntimeError(
                 f"Network access is disabled in skill sandbox (blocked host: {h}). "
@@ -97,7 +130,9 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
 
         def _patched_getaddrinfo(host, *args, **kwargs):
             _check_host(str(host))
-            return _orig_getaddrinfo(host, *args, **kwargs)
+            result = _orig_getaddrinfo(host, *args, **kwargs)
+            _remember_resolved_ips(result)
+            return result
 
         def _patched_create_connection(address, *args, **kwargs):
             host = address[0] if isinstance(address, (tuple, list)) else address
@@ -212,6 +247,7 @@ class Skill:
     tools: List[str]
     content: str
     directory: Path
+    metadata: Dict[str, str] = field(default_factory=dict)
 
 
 class SkillManager:
@@ -588,6 +624,7 @@ class SkillManager:
             tools=tools,
             content=markdown.strip(),
             directory=skill_file.parent,
+            metadata=parsed_metadata,
         )
 
     def _split_frontmatter(self, content: str) -> tuple[str, str]:
@@ -692,6 +729,28 @@ class SkillManager:
             mcp_config=mcp_config,
         )
 
+    def _resolve_skill_timeout(
+        self,
+        skill: Skill,
+        arguments: Dict[str, Any],
+        llm_config: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        raw_timeout = arguments.pop("__timeout", None)
+        if raw_timeout is None:
+            raw_timeout = skill.metadata.get("timeout_seconds") or skill.metadata.get("timeout")
+        if raw_timeout is None:
+            if llm_config:
+                raw_timeout = os.getenv("SKILL_SANDBOX_TIMEOUT_LLM") or os.getenv("SKILL_SANDBOX_TIMEOUT") or "120"
+            else:
+                raw_timeout = os.getenv("SKILL_SANDBOX_TIMEOUT") or "20"
+
+        try:
+            timeout = int(str(raw_timeout).strip())
+        except Exception:
+            timeout = 120 if llm_config else 20
+
+        return max(3, min(timeout, 600))
+
     async def _execute_skill_in_sandbox(
         self,
         skill: Skill,
@@ -700,11 +759,7 @@ class SkillManager:
         mcp_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         skill_dir = str(skill.directory)
-        timeout = int(
-            arguments.pop("__timeout", os.getenv("SKILL_SANDBOX_TIMEOUT", "20"))
-        )
-        # LLM/MCP calls inside skills may take longer; give extra headroom
-        timeout = max(3, min(timeout, 300))
+        timeout = self._resolve_skill_timeout(skill, arguments, llm_config)
 
         runner_code = self._build_sandbox_runner_code()
         payload = {
