@@ -968,3 +968,14 @@ httpx.RemoteProtocolError: peer closed connection without sending complete messa
 2026-03-06 11:56:10,010 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.25
 2026-03-06 11:56:14,356 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.58
 2026-03-06 11:56:14,358 | INFO     | ai_chat.backend | HTTP GET /api/agent/skills status=200 ip=127.0.0.1 duration_ms=0.62
+2026-03-06 12:50:21,118 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=21.36
+2026-03-06 12:53:49,154 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=6.31
+2026-03-06 12:53:49,161 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=2.47
+2026-03-06 13:14:40,923 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-06 13:14:40,967 | INFO     | ai_chat.backend | Loaded local skills on startup: count=2 names=academic-pptx,video-studio
+2026-03-06 13:16:12,132 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=11.61
+2026-03-06 13:16:12,136 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=0.71
+2026-03-06 13:53:08,680 | INFO     | services.logging_service | Logging initialized. log_file=/Users/songguodong/Workspace/Skywork/chatbot-system/backend/logs/app.log
+2026-03-06 13:53:08,738 | INFO     | ai_chat.backend | Loaded local skills on startup: count=2 names=academic-pptx,video-studio
+2026-03-06 13:53:14,311 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=6.60
+2026-03-06 13:53:14,312 | INFO     | ai_chat.backend | HTTP GET /api/conversations status=200 ip=127.0.0.1 duration_ms=0.78

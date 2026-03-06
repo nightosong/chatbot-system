@@ -1,18 +1,36 @@
-.App,
+:root {
+  --cursor-arrow: url('./assets/cursors/arrow-minimal.svg') 6 4, auto;
+}
+
+html,
 body,
-html {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff72b0' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round' d='M4 3L4 24L10.2 18.6L14.5 28L17.2 26.7L12.9 17.4L21 17.4L4 3Z'/%3E%3C/svg%3E") 4 3, auto;
+.App {
+  cursor: var(--cursor-arrow);
 }
 
 button,
 a,
-[role="button"] {
+select,
+summary,
+[role="button"],
+label[for],
+input[type="checkbox"],
+input[type="radio"] {
   cursor: pointer;
 }
 
 input,
-textarea {
+textarea,
+[contenteditable="true"] {
   cursor: text;
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 .App {
@@ -67,7 +85,6 @@ textarea {
   z-index: 1;
 }
 
-/* Mode Switch */
 .mode-switch {
   display: flex;
   gap: 0.4rem;
@@ -84,10 +101,9 @@ textarea {
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.85);
-  border-radius: 25px;
-  cursor: pointer;
   font-size: 0.95rem;
   font-weight: 700;
+  border-radius: 25px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   letter-spacing: 0.5px;
@@ -124,7 +140,6 @@ textarea {
 }
 
 @keyframes pulse-glow {
-
   0%,
   100% {
     opacity: 0.3;
@@ -144,7 +159,6 @@ textarea {
   background: rgba(255, 255, 255, 0.3);
   color: white;
   border-radius: 20px;
-  cursor: pointer;
   font-size: 1rem;
   font-weight: 600;
   transition: all 0.3s ease;
