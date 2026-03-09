@@ -4,9 +4,14 @@ import './MessageInput.css';
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   disabled: boolean;
+  leadingAccessory?: React.ReactNode;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) => {
+const MessageInput: React.FC<MessageInputProps> = ({
+  onSendMessage,
+  disabled,
+  leadingAccessory,
+}) => {
   const [message, setMessage] = useState('');
 
   const handleSend = () => {
@@ -25,16 +30,21 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, disabled }) 
 
   return (
     <div className="message-input">
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyPress={handleKeyPress}
-        placeholder="输入消息... (Shift+Enter 换行) ✨"
-        disabled={disabled}
-        rows={3}
-      />
+      <div className={`message-input-field ${leadingAccessory ? 'has-leading' : ''}`}>
+        {leadingAccessory && (
+          <div className="message-input-leading">{leadingAccessory}</div>
+        )}
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="输入消息... (Shift+Enter 换行)"
+          disabled={disabled}
+          rows={3}
+        />
+      </div>
       <button onClick={handleSend} disabled={disabled || !message.trim()}>
-        {disabled ? '⏳' : '💌'} 发送
+        发送
       </button>
     </div>
   );

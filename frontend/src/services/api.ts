@@ -4,6 +4,8 @@ import {
   ChatResponse,
   Conversation,
   ConversationDetail,
+  CreateConversationRequest,
+  CreateConversationResponse,
   AgentRequest,
   AgentStreamEvent,
   AgentSkill,
@@ -146,6 +148,13 @@ export const uploadFile = async (file: File): Promise<FileUploadResponse> => {
   return response.data;
 };
 
+export const createConversation = async (
+  request: CreateConversationRequest = {}
+): Promise<CreateConversationResponse> => {
+  const response = await api.post<CreateConversationResponse>('/api/conversations', request);
+  return response.data;
+};
+
 export const getConversations = async (): Promise<Conversation[]> => {
   const response = await api.get<Conversation[]>('/api/conversations');
   return response.data;
@@ -158,6 +167,17 @@ export const getConversation = async (conversationId: string): Promise<Conversat
 
 export const deleteConversation = async (conversationId: string): Promise<void> => {
   await api.delete(`/api/conversations/${conversationId}`);
+};
+
+export const persistAgentRunConfirmation = async (
+  conversationId: string,
+  request: {
+    run_started_at: string;
+    step_timestamp: string;
+    selected_action: string;
+  }
+): Promise<void> => {
+  await api.post(`/api/conversations/${conversationId}/agent-runs/confirm`, request);
 };
 
 /**

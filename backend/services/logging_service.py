@@ -53,6 +53,20 @@ def setup_logging(log_dir: str, level: str = "INFO") -> str:
         logger.handlers.clear()
         logger.propagate = True
 
+    # Suppress noisy dependency request logs unless backend explicitly runs at WARNING/DEBUG overrides
+    for logger_name in (
+        "httpx",
+        "httpcore",
+        "httpcore.connection",
+        "httpcore.http11",
+        "httpcore.http2",
+        "httpcore.proxy",
+    ):
+        logger = logging.getLogger(logger_name)
+        logger.handlers.clear()
+        logger.setLevel(logging.WARNING)
+        logger.propagate = True
+
     logging.getLogger(__name__).info("Logging initialized. log_file=%s", log_file)
     return log_file
 

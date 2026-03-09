@@ -9,6 +9,7 @@ jest.mock('./services/api');
 const mockConversations = [
   {
     conversation_id: '1',
+    project_id: '1',
     title: 'Test Conversation',
     created_at: '2024-01-01T00:00:00',
     updated_at: '2024-01-01T00:00:00',
@@ -18,6 +19,8 @@ const mockConversations = [
 
 describe('App Component', () => {
   beforeEach(() => {
+    window.history.pushState({}, '', '/');
+    localStorage.clear();
     (api.getConversations as jest.Mock).mockResolvedValue(mockConversations);
   });
 

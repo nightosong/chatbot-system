@@ -12,6 +12,7 @@ import json
 import os
 import time
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi.responses import StreamingResponse  # type: ignore
 from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
@@ -37,6 +38,8 @@ from models.conversation import (
     AgentRequest,
     AgentConfig,
     CodeRequest,
+    CreateConversationRequest,
+    CreateConversationResponse,
 )
 
 warnings.filterwarnings(
@@ -132,6 +135,14 @@ class LogTailResponse(BaseModel):
     lines: List[str]
 
 
+class AgentRunConfirmationRequest(BaseModel):
+    """Request model for persisting confirmation action state"""
+
+    run_started_at: str
+    step_timestamp: str
+    selected_action: str
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -203,11 +214,12 @@ async def chat(request: ChatRequest):
     Handles multi-turn conversations with optional file context
     """
     try:
-        # Get conversation history if conversation_id is provided
+        # Get conversation/project history if provided
         history = []
-        if request.conversation_id:
+        active_conversation_id = request.conversation_id or request.project_id
+        if active_conversation_id:
             history = conversation_service.get_conversation_messages(
-                request.conversation_id
+                active_conversation_id
             )
 
         # Generate response using LLM
@@ -224,13 +236,17 @@ async def chat(request: ChatRequest):
 
         # Save conversation
         conversation_id = conversation_service.save_message(
-            conversation_id=request.conversation_id,
+            conversation_id=(request.conversation_id or request.project_id),
             user_message=request.message,
             assistant_message=response,
             file_context=request.file_context,
         )
 
-        return ChatResponse(message=response, conversation_id=conversation_id)
+        return ChatResponse(
+            message=response,
+            conversation_id=conversation_id,
+            project_id=conversation_id,
+        )
     except Exception as e:
         logger.exception("Chat request failed")
         raise HTTPException(status_code=500, detail=str(e))
@@ -267,6 +283,16 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/api/conversations", response_model=CreateConversationResponse)
+async def create_conversation(request: CreateConversationRequest):
+    """Create an empty conversation and return its id immediately"""
+    try:
+        return conversation_service.create_conversation(title=request.title)
+    except Exception as e:
+        logger.exception("Create conversation failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/conversations", response_model=List[ConversationHistory])
 async def get_conversations():
     """
@@ -287,10 +313,44 @@ async def get_conversation(conversation_id: str):
     """
     try:
         messages = conversation_service.get_conversation_messages(conversation_id)
-        return {"conversation_id": conversation_id, "messages": messages}
+        return {
+            "conversation_id": conversation_id,
+            "project_id": conversation_id,
+            "messages": messages,
+        }
     except Exception as e:
         logger.exception("Get conversation failed: conversation_id=%s", conversation_id)
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/conversations/{conversation_id}/agent-runs/confirm")
+async def save_agent_run_confirmation(
+    conversation_id: str, request: AgentRunConfirmationRequest
+):
+    """Persist selected confirmation action for an agent run."""
+    try:
+        conversation_service.save_agent_run_confirmation(
+            conversation_id=conversation_id,
+            run_started_at=request.run_started_at,
+            step_timestamp=request.step_timestamp,
+            selected_action=request.selected_action,
+        )
+        return {
+            "status": "ok",
+            "conversation_id": conversation_id,
+            "run_started_at": request.run_started_at,
+            "step_timestamp": request.step_timestamp,
+            "selected_action": request.selected_action,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.exception(
+            "Failed to persist agent confirmation: conversation_id=%s run_started_at=%s",
+            conversation_id,
+            request.run_started_at,
+        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/api/conversations/{conversation_id}")
@@ -300,7 +360,11 @@ async def delete_conversation(conversation_id: str):
     """
     try:
         conversation_service.delete_conversation(conversation_id)
-        return {"status": "deleted", "conversation_id": conversation_id}
+        return {
+            "status": "deleted",
+            "conversation_id": conversation_id,
+            "project_id": conversation_id,
+        }
     except Exception as e:
         logger.exception(
             "Delete conversation failed: conversation_id=%s", conversation_id
@@ -323,12 +387,82 @@ async def agent_chat(request: AgentRequest):
 
     async def event_generator():
         """Generate SSE events"""
+        started_at = datetime.now().isoformat()
+        agent_run_events = []
+        tool_calls_log = []
+        final_messages = []
+        history = []
+        active_conversation_id = request.conversation_id or request.project_id
+
+        def _sanitize_chunk(chunk: Dict[str, Any]) -> Dict[str, Any]:
+            sanitized = dict(chunk)
+            sanitized.pop("messages", None)
+            sanitized.setdefault("timestamp", datetime.now().isoformat())
+            return sanitized
+
+        def _build_persisted_turn_messages(status: str, summary: str) -> List[dict]:
+            finished_at = datetime.now().isoformat()
+            history_offset = 1 + len(history)
+            current_turn_messages = [dict(msg) for msg in final_messages[history_offset:]] if final_messages else []
+
+            if not current_turn_messages or current_turn_messages[0].get("role") != "user":
+                current_turn_messages.insert(
+                    0,
+                    {
+                        "role": "user",
+                        "content": request.message,
+                        "timestamp": started_at,
+                        "file_context": request.file_context,
+                    },
+                )
+            elif not current_turn_messages[0].get("timestamp"):
+                current_turn_messages[0]["timestamp"] = started_at
+                if request.file_context and not current_turn_messages[0].get("file_context"):
+                    current_turn_messages[0]["file_context"] = request.file_context
+
+            persisted_summary = (summary or "").strip()
+            run_payload = {
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "status": status,
+                "summary": persisted_summary,
+                "tool_calls_count": len(tool_calls_log),
+                "events": agent_run_events,
+                "anchor_timestamp": current_turn_messages[0].get("timestamp", started_at),
+            }
+
+            assistant_indices = [
+                idx for idx, msg in enumerate(current_turn_messages)
+                if msg.get("role") == "assistant"
+            ]
+            if assistant_indices:
+                target_index = assistant_indices[-1]
+                target_message = current_turn_messages[target_index]
+                target_message.setdefault("metadata", {})
+                target_message["metadata"]["agent_run"] = run_payload
+                if not target_message.get("timestamp"):
+                    target_message["timestamp"] = finished_at
+            else:
+                current_turn_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": persisted_summary or "Agent 执行完成",
+                        "timestamp": finished_at,
+                        "metadata": {"agent_run": run_payload},
+                    }
+                )
+
+            for msg in current_turn_messages:
+                if not msg.get("timestamp"):
+                    msg["timestamp"] = finished_at
+
+            return current_turn_messages
+
         try:
             # Get conversation history
-            history = []
-            if request.conversation_id:
+            if active_conversation_id:
                 history = conversation_service.get_conversation_messages(
-                    request.conversation_id
+                    active_conversation_id
                 )
 
             # Configure agent
@@ -340,16 +474,12 @@ async def agent_chat(request: AgentRequest):
                 request_mcp_client = MCPClient(servers_config=agent_config.mcp_servers)
 
             # Create a per-request AgentService instance
-            # This allows each request to have its own MCP configuration
             request_agent_service = AgentService(
                 mcp_client=request_mcp_client,
-                skill_manager=skill_manager  # Share the global skill manager singleton
+                skill_manager=skill_manager,
             )
 
-            # Generate streaming response
             full_response = ""
-            tool_calls_log = []
-            final_messages = []
 
             async for chunk in request_agent_service.generate_stream(
                 message=request.message,
@@ -364,38 +494,36 @@ async def agent_chat(request: AgentRequest):
                 selected_skill_names=agent_config.selected_skills,
                 max_iterations=agent_config.max_iterations,
             ):
-                # Capture final messages for saving
                 if chunk.get("type") == "done" and "messages" in chunk:
                     final_messages = chunk["messages"]
-                    # Don't send this to client, handle it internally
                     continue
 
-                # Send chunk as SSE
+                agent_run_events.append(_sanitize_chunk(chunk))
+
                 event_data = json.dumps(chunk, ensure_ascii=False)
                 yield f"data: {event_data}\n\n"
 
-                # Collect response for saving
                 if chunk.get("type") == "text":
                     full_response += chunk.get("content", "")
                 elif chunk.get("type") == "tool_call":
                     tool_calls_log.append(chunk)
 
-            # Save conversation with complete message history
-            if final_messages:
-                conversation_id = conversation_service.save_messages(
-                    messages=final_messages,
-                    conversation_id=request.conversation_id,
-                )
+            persisted_messages = _build_persisted_turn_messages(
+                status="completed",
+                summary=full_response,
+            )
+            conversation_id = conversation_service.save_messages(
+                messages=persisted_messages,
+                conversation_id=active_conversation_id,
+            )
 
-                # Send final metadata
-                metadata = {
-                    "type": "metadata",
-                    "conversation_id": conversation_id,
-                    "tool_calls_count": len(tool_calls_log),
-                }
-                yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
-
-            # Send final done event
+            metadata = {
+                "type": "metadata",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "tool_calls_count": len(tool_calls_log),
+            }
+            yield f"data: {json.dumps(metadata, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
@@ -407,8 +535,39 @@ async def agent_chat(request: AgentRequest):
                 "content": str(e),
                 "traceback": traceback.format_exc(),
             }
-            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+            agent_run_events.append(_sanitize_chunk(error_data))
 
+            persisted_messages = [
+                {
+                    "role": "user",
+                    "content": request.message,
+                    "timestamp": started_at,
+                    "file_context": request.file_context,
+                },
+                {
+                    "role": "assistant",
+                    "content": f"❌ Agent 执行失败：{str(e)}",
+                    "timestamp": datetime.now().isoformat(),
+                    "metadata": {
+                        "agent_run": {
+                            "started_at": started_at,
+                            "finished_at": datetime.now().isoformat(),
+                            "status": "error",
+                            "summary": f"❌ Agent 执行失败：{str(e)}",
+                            "tool_calls_count": len(tool_calls_log),
+                            "events": agent_run_events,
+                            "anchor_timestamp": started_at,
+                        }
+                    },
+                },
+            ]
+            conversation_id = conversation_service.save_messages(
+                messages=persisted_messages,
+                conversation_id=active_conversation_id,
+            )
+            error_data["conversation_id"] = conversation_id
+            error_data["project_id"] = conversation_id
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -439,7 +598,7 @@ async def get_agent_tools():
             "categories": {
                 "builtin": len(builtin_tools),
             },
-            "note": "Per-request MCP tools are configured dynamically via agent_config.mcp_servers"
+            "note": "Per-request MCP tools are configured dynamically via agent_config.mcp_servers",
         }
     except Exception as e:
         logger.exception("Get agent tools failed")
@@ -493,7 +652,7 @@ async def configure_agent(config: AgentConfig):
         return {
             "status": "configured",
             "config": config.model_dump(),
-            "note": "AgentService now uses per-request configuration. Pass mcp_servers in agent_config for each request."
+            "note": "AgentService now uses per-request configuration. Pass mcp_servers in agent_config for each request.",
         }
     except Exception as e:
         logger.exception("Configure agent failed")

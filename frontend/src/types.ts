@@ -1,11 +1,16 @@
 export interface Message {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool' | string;
   content: string;
   timestamp: string;
+  file_context?: string | null;
+  metadata?: Record<string, any>;
+  tool_calls?: any;
+  tool_call_id?: string;
 }
 
 export interface Conversation {
   conversation_id: string;
+  project_id: string;
   title: string;
   created_at: string;
   updated_at: string;
@@ -15,6 +20,7 @@ export interface Conversation {
 export interface ChatRequest {
   message: string;
   conversation_id?: string | null;
+  project_id?: string | null;
   file_context?: string | null;
   llm_config?: {
     provider: string;
@@ -28,11 +34,26 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: string;
   conversation_id: string;
+  project_id: string;
 }
 
 export interface ConversationDetail {
   conversation_id: string;
+  project_id: string;
   messages: Message[];
+}
+
+export interface CreateConversationRequest {
+  title?: string | null;
+}
+
+export interface CreateConversationResponse {
+  conversation_id: string;
+  project_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
 }
 
 export interface ModelConfig {
@@ -107,6 +128,7 @@ export interface BackendLogsResponse {
 export interface AgentRequest {
   message: string;
   conversation_id?: string | null;
+  project_id?: string | null;
   file_context?: string | null;
   llm_config?: {
     provider: string;
@@ -129,11 +151,13 @@ export interface AgentStreamEvent {
     | 'metadata'
     | 'confirmation_required'
     | 'permission_required';
+  timestamp?: string;
   content?: string;
   tool?: string;
   args?: any;
   result?: string;
   conversation_id?: string;
+  project_id?: string;
   tool_calls_count?: number;
   title?: string;
   message?: string;
@@ -155,6 +179,7 @@ export interface ToolCall {
 export interface CodeRequest {
   message: string;
   conversation_id?: string | null;
+  project_id?: string | null;
   history?: Message[];
   llm_config?: {
     provider: string;
@@ -176,6 +201,7 @@ export interface CodeStreamEvent {
   message?: string;      // Progress message
   percentage?: number;   // Progress percentage (0-100)
   conversation_id?: string;
+  project_id?: string;
   action?: string;
   target?: string;
 }

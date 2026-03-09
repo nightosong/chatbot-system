@@ -90,6 +90,7 @@ const CodeWindow: React.FC<CodeWindowProps> = ({
         {
           message: content,
           conversation_id: conversationId,
+          project_id: conversationId,
           history: messages,
           llm_config: llmConfig,
           language: language,
@@ -137,8 +138,9 @@ const CodeWindow: React.FC<CodeWindowProps> = ({
             setStreamingContent(assistantContent);
           } else if (event.type === 'metadata' && event.conversation_id) {
             // Update conversation ID if this is a new conversation
-            if (!conversationId && onConversationIdChange) {
-              onConversationIdChange(event.conversation_id);
+            const resolvedProjectId = event.project_id || event.conversation_id;
+            if (!conversationId && resolvedProjectId && onConversationIdChange) {
+              onConversationIdChange(resolvedProjectId);
             }
           }
         }

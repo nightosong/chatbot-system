@@ -4,9 +4,10 @@ import { uploadFile, FileUploadResponse } from '../services/api';
 
 interface FileUploadProps {
   onFileUpload: (content: string, filename: string) => void;
+  compact?: boolean;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload, compact = false }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +73,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   };
 
   return (
-    <div className="file-upload">
+    <div className={`file-upload ${compact ? 'compact' : ''}`}>
       <input
         ref={fileInputRef}
         type="file"
@@ -83,9 +84,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       <button
         onClick={handleButtonClick}
         disabled={isUploading}
-        className="upload-btn"
+        className={`upload-btn ${isUploading ? 'is-uploading' : ''}`}
+        aria-label={isUploading ? '正在上传文件' : '上传文件'}
+        title={isUploading ? '正在上传文件' : '上传文件'}
       >
-        {isUploading ? '⏳ 上传中...' : '📎 上传文件'}
+        {compact ? (
+          <span className="upload-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12.9 5.05L7.05 10.9C5.97 11.98 5.97 13.72 7.05 14.8C8.13 15.88 9.87 15.88 10.95 14.8L16.6 9.15C18.04 7.71 18.04 5.38 16.6 3.94C15.16 2.5 12.83 2.5 11.39 3.94L5.18 10.15C3.38 11.95 3.38 14.87 5.18 16.67C6.98 18.47 9.9 18.47 11.7 16.67L16.05 12.32"
+                stroke="currentColor"
+                strokeWidth="1.85"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        ) : isUploading ? (
+          '⏳ 上传中...'
+        ) : (
+          '上传文件'
+        )}
       </button>
       {error && <div className="upload-error">{error}</div>}
       {uploadInfo && <div className="upload-info">{uploadInfo}</div>}

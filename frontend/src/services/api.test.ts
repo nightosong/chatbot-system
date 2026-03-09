@@ -10,7 +10,7 @@ describe('API Service', () => {
   });
 
   test('sendMessage calls correct endpoint', async () => {
-    const mockResponse = { message: 'Response', conversation_id: '123' };
+    const mockResponse = { message: 'Response', conversation_id: '123', project_id: '123' };
     mockedAxios.post.mockResolvedValue({ data: mockResponse });
 
     const request = { message: 'Test', conversation_id: null, file_context: null };
@@ -24,6 +24,7 @@ describe('API Service', () => {
     const mockConversations = [
       {
         conversation_id: '1',
+        project_id: '1',
         title: 'Test',
         created_at: '2024-01-01',
         updated_at: '2024-01-01',

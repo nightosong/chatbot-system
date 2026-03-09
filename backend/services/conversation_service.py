@@ -5,7 +5,7 @@ Uses SQLite for local storage
 import sqlite3
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 import os
 
@@ -55,6 +55,31 @@ class ConversationService:
         conn.commit()
         conn.close()
     
+
+    def create_conversation(self, title: Optional[str] = None) -> dict:
+        """Create an empty conversation/project and return its metadata"""
+        conversation_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        conversation_title = (title or "新对话").strip() or "新对话"
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (conversation_id, conversation_title, now, now)
+        )
+        conn.commit()
+        conn.close()
+
+        return {
+            "conversation_id": conversation_id,
+            "project_id": conversation_id,
+            "title": conversation_title,
+            "created_at": now,
+            "updated_at": now,
+            "message_count": 0,
+        }
+
     def save_message(
         self,
         user_message: str,
@@ -162,23 +187,27 @@ class ConversationService:
             )
 
         # Save all messages
-        timestamp = datetime.now().isoformat()
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")
+            timestamp = msg.get("timestamp") or datetime.now().isoformat()
+            file_context = msg.get("file_context")
 
-            # Serialize metadata (tool_calls, tool_call_id, etc.)
-            metadata = {}
-            if "tool_calls" in msg:
-                metadata["tool_calls"] = msg["tool_calls"]
-            if "tool_call_id" in msg:
-                metadata["tool_call_id"] = msg["tool_call_id"]
+            metadata: Dict[str, Any] = {}
+            explicit_metadata = msg.get("metadata")
+            if isinstance(explicit_metadata, dict):
+                metadata.update(explicit_metadata)
 
-            metadata_json = json.dumps(metadata) if metadata else None
+            for key, value in msg.items():
+                if key in {"role", "content", "timestamp", "file_context", "metadata"}:
+                    continue
+                metadata[key] = value
+
+            metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
 
             cursor.execute(
                 "INSERT INTO messages (conversation_id, role, content, timestamp, file_context, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-                (conversation_id, role, content, timestamp, None, metadata_json)
+                (conversation_id, role, content, timestamp, file_context, metadata_json)
             )
 
         conn.commit()
@@ -186,6 +215,67 @@ class ConversationService:
 
         return conversation_id
     
+    def save_agent_run_confirmation(
+        self,
+        conversation_id: str,
+        run_started_at: str,
+        step_timestamp: str,
+        selected_action: str,
+    ) -> bool:
+        """Persist selected confirmation action into assistant message metadata."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT id, metadata FROM messages WHERE conversation_id = ? AND role = ? ORDER BY timestamp DESC",
+            (conversation_id, "assistant"),
+        )
+
+        target_message_id = None
+        updated_metadata = None
+
+        for message_id, metadata_raw in cursor.fetchall():
+            if not metadata_raw:
+                continue
+            try:
+                metadata = json.loads(metadata_raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(metadata, dict):
+                continue
+
+            agent_run = metadata.get("agent_run")
+            if not isinstance(agent_run, dict):
+                continue
+            if agent_run.get("started_at") != run_started_at:
+                continue
+
+            confirmations = agent_run.get("confirmations")
+            if not isinstance(confirmations, dict):
+                confirmations = {}
+            confirmations[step_timestamp] = selected_action
+            agent_run["confirmations"] = confirmations
+            metadata["agent_run"] = agent_run
+            target_message_id = message_id
+            updated_metadata = json.dumps(metadata, ensure_ascii=False)
+            break
+
+        if target_message_id is None or updated_metadata is None:
+            conn.close()
+            raise ValueError("Agent run not found for confirmation update")
+
+        cursor.execute(
+            "UPDATE messages SET metadata = ? WHERE id = ?",
+            (updated_metadata, target_message_id),
+        )
+        cursor.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), conversation_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+
     def get_conversation_messages(self, conversation_id: str) -> List[dict]:
         """
         Get all messages for a conversation (including tool calls metadata)
@@ -216,10 +306,12 @@ class ConversationService:
             if row[3]:
                 try:
                     metadata = json.loads(row[3])
-                    if "tool_calls" in metadata:
-                        msg["tool_calls"] = metadata["tool_calls"]
-                    if "tool_call_id" in metadata:
-                        msg["tool_call_id"] = metadata["tool_call_id"]
+                    if isinstance(metadata, dict):
+                        msg["metadata"] = metadata
+                        if "tool_calls" in metadata:
+                            msg["tool_calls"] = metadata["tool_calls"]
+                        if "tool_call_id" in metadata:
+                            msg["tool_call_id"] = metadata["tool_call_id"]
                 except json.JSONDecodeError:
                     pass  # Ignore invalid metadata
 
@@ -254,6 +346,7 @@ class ConversationService:
         conversations = [
             {
                 "conversation_id": row[0],
+                "project_id": row[0],
                 "title": row[1],
                 "created_at": row[2],
                 "updated_at": row[3],

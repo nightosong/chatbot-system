@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint"""
     message: str
     conversation_id: Optional[str] = None
+    project_id: Optional[str] = None
     file_context: Optional[str] = None
     llm_config: Optional[ModelConfig] = None
     language: Optional[str] = None  # 语言设置（如 'zh-CN', 'en-US', 'auto' 等）
@@ -27,6 +28,7 @@ class ChatResponse(BaseModel):
     """Response model for chat endpoint"""
     message: str
     conversation_id: str
+    project_id: str
 
 
 class Message(BaseModel):
@@ -39,6 +41,7 @@ class Message(BaseModel):
 class ConversationHistory(BaseModel):
     """Conversation history model"""
     conversation_id: str
+    project_id: str
     title: str
     created_at: str
     updated_at: str
@@ -58,6 +61,7 @@ class AgentRequest(BaseModel):
     """Request model for agent endpoint"""
     message: str
     conversation_id: Optional[str] = None
+    project_id: Optional[str] = None
     file_context: Optional[str] = None
     llm_config: Optional[ModelConfig] = None
     language: Optional[str] = None
@@ -68,6 +72,7 @@ class CodeRequest(BaseModel):
     """Request model for code mode endpoint"""
     message: str
     conversation_id: Optional[str] = None
+    project_id: Optional[str] = None
     history: Optional[List[dict]] = None  # Full conversation history
     llm_config: Optional[ModelConfig] = None
     language: Optional[str] = None
@@ -80,3 +85,18 @@ class PermissionRule(BaseModel):
     tool: str  # Tool name (read, write, edit, bash, etc.)
     pattern: str  # Pattern to match (supports wildcards)
     action: str  # Action to take: allow, deny, ask
+
+
+class CreateConversationRequest(BaseModel):
+    """Request model for creating an empty conversation"""
+    title: Optional[str] = None
+
+
+class CreateConversationResponse(BaseModel):
+    """Response model for creating an empty conversation"""
+    conversation_id: str
+    project_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
