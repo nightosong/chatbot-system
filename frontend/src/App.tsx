@@ -143,10 +143,6 @@ function App() {
     <div className="App">
       <header className="App-header">
         <div className="header-brand">
-          <button type="button" className="header-home-btn" onClick={handleGoHome} title="返回首页">
-            <span className="header-home-icon" aria-hidden="true">⌂</span>
-            <span>首页</span>
-          </button>
           <button type="button" className="header-title-btn" onClick={handleGoHome}>
             <h1>Emoji Studio ✨</h1>
           </button>
@@ -198,9 +194,7 @@ function App() {
         {!currentConversationId ? (
           <HomePage
             onStartConversation={handleNewChat}
-            onOpenConversation={handleSelectConversation}
             isCreatingConversation={isCreatingConversation}
-            recentConversations={conversations.slice(0, 6)}
           />
         ) : chatMode === 'code' ? (
           <CodeWindow

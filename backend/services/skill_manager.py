@@ -208,10 +208,18 @@ SANDBOX_RUNNER_CODE = textwrap.dedent(
 
         script_file = _find_script(scripts_dir)
         if not script_file:
-            print(json.dumps({
-                "success": False,
-                "error": "No executable script found. Expected scripts/run.py or scripts/main.py",
-            }, ensure_ascii=False))
+            print(
+                json.dumps(
+                    {
+                        "success": True,
+                        "result": {
+                            "mode": "instruction_only",
+                            "instruction": payload.get("instruction", ""),
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+            )
             return
 
         module = _load_module(script_file, "dynamic_skill_runtime")

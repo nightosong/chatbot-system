@@ -12,7 +12,7 @@ def reset_skill_manager_singletons():
 
 
 def _write_skill(
-    root, folder_name: str, skill_name: str, description: str, script_body: str
+    root, folder_name: str, skill_name: str, description: str, script_body: str = ""
 ):
     skill_dir = root / folder_name
     skill_dir.mkdir(parents=True)
@@ -29,7 +29,8 @@ tools: []
     )
     scripts_dir = skill_dir / "scripts"
     scripts_dir.mkdir()
-    (scripts_dir / "run.py").write_text(script_body.strip(), encoding="utf-8")
+    if script_body:
+        (scripts_dir / "run.py").write_text(script_body.strip(), encoding="utf-8")
     return skill_dir
 
 
@@ -106,6 +107,25 @@ def run(arguments, context):
     assert exec_result["success"] is True
     assert marker.exists()
     assert exec_result["result"]["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_dynamic_skill_executes_with_no_scripts(tmp_path):
+    manager = SkillManager(workspace_root=str(tmp_path))
+    custom_root = tmp_path / "custom_skills"
+    _write_skill(
+        custom_root,
+        "instruction-only",
+        "instruction-only",
+        "Instruction only skill",
+    )
+
+    await manager.load_skills_from_source(str(custom_root))
+    exec_result = await manager.execute_skill("instruction-only", {})
+
+    assert exec_result["success"] is True
+    assert exec_result["result"]["mode"] == "instruction_only"
+    assert "instruction" in exec_result["result"]
 
 
 @pytest.mark.asyncio

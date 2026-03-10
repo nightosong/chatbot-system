@@ -1,35 +1,28 @@
 import React from 'react';
 import './HomePage.css';
-import { Conversation } from '../types';
-
 interface HomePageProps {
   onStartConversation: () => void;
-  onOpenConversation: (conversationId: string) => void;
   isCreatingConversation?: boolean;
-  recentConversations: Conversation[];
 }
 
 const HomePage: React.FC<HomePageProps> = ({
   onStartConversation,
-  onOpenConversation,
   isCreatingConversation = false,
-  recentConversations,
 }) => {
-  const recentItems = recentConversations.slice(0, 3);
 
   return (
     <div className="home-page">
       <div className="home-page-shell">
         <section className="home-page-hero">
           <div className="home-page-hero-copy">
-            <div className="home-page-badge">Emoji Studio Workspace</div>
+            <div className="home-page-badge">Emoji Studio Workspace · 持续对话空间</div>
             <h2 className="home-page-title">
               让每一次对话，
-              <span className="home-page-title-accent">都成为可持续推进的工作空间</span>
+              <span className="home-page-title-accent">都能持续推进到结果</span>
             </h2>
             <p className="home-page-subtitle">
-              创建一个新的会话后，系统会立即分配唯一的 <code>conversation_id</code>，并进入对应页面；
-              无论刷新还是返回，都能继续停留在当前上下文中。
+              新建会话后会立即生成唯一的 <code>conversation_id</code> 并同步到 URL，
+              让你随时回到同一上下文继续完成任务。
             </p>
             <div className="home-page-actions">
               <button
@@ -72,34 +65,6 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
         </section>
 
-        <section className="home-page-section">
-          <div className="home-page-section-header">
-            <div>
-              <h3>最近会话</h3>
-              <p>继续你最近的上下文，而不必重新开始。</p>
-            </div>
-            {recentItems.length > 0 && <span>{recentItems.length} 个</span>}
-          </div>
-          {recentItems.length === 0 ? (
-            <div className="home-page-empty">当前还没有最近会话，先创建一个新的吧。</div>
-          ) : (
-            <div className="home-page-recent-list">
-              {recentItems.map((conversation) => (
-                <button
-                  key={conversation.conversation_id}
-                  type="button"
-                  className="home-page-recent-item"
-                  onClick={() => onOpenConversation(conversation.conversation_id)}
-                >
-                  <span className="home-page-recent-title">{conversation.title}</span>
-                  <span className="home-page-recent-meta">
-                    {conversation.message_count} 条消息 · {new Date(conversation.updated_at).toLocaleDateString('zh-CN')}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
       </div>
     </div>
   );

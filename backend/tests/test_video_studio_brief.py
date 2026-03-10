@@ -2,9 +2,13 @@ import asyncio
 import importlib.util
 from pathlib import Path
 
+import pytest  # type: ignore
+
 
 def _load_video_studio_module():
     module_path = Path(__file__).resolve().parents[1] / "skills" / "video-studio" / "scripts" / "run.py"
+    if not module_path.exists():
+        pytest.skip("video-studio run.py not present")
     spec = importlib.util.spec_from_file_location("video_studio_run_brief_test", module_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

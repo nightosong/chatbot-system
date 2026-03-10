@@ -27,6 +27,7 @@ from services.llm_service import LLMService
 from services.file_service import FileService
 from services.conversation_service import ConversationService
 from services.agent_service import AgentService
+from services.agent_service_v2 import AgentServiceV2
 from services.code_service import CodeService
 from services.mcp_client import MCPClient, BuiltinMCPTools
 from services.skill_manager import SkillManager
@@ -569,6 +570,245 @@ async def agent_chat(request: AgentRequest):
                             "tool_calls_count": len(tool_calls_log),
                             "events": agent_run_events,
                             "anchor_timestamp": started_at,
+                        }
+                    },
+                },
+            ]
+            conversation_id = conversation_service.save_messages(
+                messages=persisted_messages,
+                conversation_id=active_conversation_id,
+            )
+            error_data["conversation_id"] = conversation_id
+            error_data["project_id"] = conversation_id
+            yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post("/api/agent/chat/v2")
+async def agent_chat_v2(request: AgentRequest):
+    """
+    Agent mode chat endpoint V2 with proper Skills architecture
+    
+    Key differences from V1:
+    - Skills are NOT exposed as tools
+    - SKILL.md content is loaded on-demand
+    - Agent follows skill instructions to call MCP tools
+    - Better workflow understanding and execution
+    
+    Returns Server-Sent Events (SSE) stream with:
+    - text chunks
+    - tool calls
+    - tool results
+    - skill activations
+    """
+
+    async def event_generator():
+        """Generate SSE events"""
+        started_at = datetime.now().isoformat()
+        agent_run_events = []
+        tool_calls_log = []
+        final_messages = []
+        history = []
+        active_conversation_id = request.conversation_id or request.project_id
+
+        def _sanitize_chunk(chunk: Dict[str, Any]) -> Dict[str, Any]:
+            sanitized = dict(chunk)
+            sanitized.pop("messages", None)
+            sanitized.setdefault("timestamp", datetime.now().isoformat())
+            return sanitized
+
+        def _build_persisted_turn_messages(status: str, summary: str) -> List[dict]:
+            finished_at = datetime.now().isoformat()
+            history_offset = 1 + len(history)
+            current_turn_messages = (
+                [dict(msg) for msg in final_messages[history_offset:]]
+                if final_messages
+                else []
+            )
+
+            if (
+                not current_turn_messages
+                or current_turn_messages[0].get("role") != "user"
+            ):
+                current_turn_messages.insert(
+                    0,
+                    {
+                        "role": "user",
+                        "content": request.message,
+                        "timestamp": started_at,
+                        "file_context": request.file_context,
+                    },
+                )
+            elif not current_turn_messages[0].get("timestamp"):
+                current_turn_messages[0]["timestamp"] = started_at
+                if request.file_context and not current_turn_messages[0].get(
+                    "file_context"
+                ):
+                    current_turn_messages[0]["file_context"] = request.file_context
+
+            persisted_summary = (summary or "").strip()
+            run_payload = {
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "status": status,
+                "summary": persisted_summary,
+                "tool_calls_count": len(tool_calls_log),
+                "events": agent_run_events,
+                "anchor_timestamp": current_turn_messages[0].get(
+                    "timestamp", started_at
+                ),
+                "version": "v2",  # Mark as V2 execution
+            }
+
+            assistant_indices = [
+                idx
+                for idx, msg in enumerate(current_turn_messages)
+                if msg.get("role") == "assistant"
+            ]
+            if assistant_indices:
+                target_index = assistant_indices[-1]
+                target_message = current_turn_messages[target_index]
+                target_message.setdefault("metadata", {})
+                target_message["metadata"]["agent_run"] = run_payload
+                if not target_message.get("timestamp"):
+                    target_message["timestamp"] = finished_at
+            else:
+                current_turn_messages.append(
+                    {
+                        "role": "assistant",
+                        "content": persisted_summary or "Agent 执行完成 (V2)",
+                        "timestamp": finished_at,
+                        "metadata": {"agent_run": run_payload},
+                    }
+                )
+
+            for msg in current_turn_messages:
+                if not msg.get("timestamp"):
+                    msg["timestamp"] = finished_at
+
+            return current_turn_messages
+
+        try:
+            # Get conversation history
+            if active_conversation_id:
+                history = conversation_service.get_messages(active_conversation_id)
+            
+            # Configure agent
+            agent_config = request.agent_config or AgentConfig()
+            
+            # Create per-request MCP client
+            request_mcp_client = None
+            if agent_config.enable_mcp and agent_config.mcp_servers:
+                request_mcp_client = MCPClient(servers_config=agent_config.mcp_servers)
+            
+            # Create V2 AgentService instance
+            request_agent_service = AgentServiceV2(
+                mcp_client=request_mcp_client,
+                skill_manager=skill_manager,
+            )
+            
+            # Stream agent response
+            last_text_content = []
+            async for chunk in request_agent_service.generate_stream(
+                message=request.message,
+                conversation_history=history,
+                file_context=request.file_context,
+                model_config=request.model_config,
+                language=request.language,
+                enable_mcp=agent_config.enable_mcp,
+                enable_skills=agent_config.enable_skills,
+                selected_skill_names=agent_config.selected_skills,
+                max_iterations=agent_config.max_iterations,
+            ):
+                chunk_type = chunk.get("type")
+                
+                # Log events
+                agent_run_events.append(_sanitize_chunk(chunk))
+                
+                # Track tool calls
+                if chunk_type == "tool_call":
+                    tool_calls_log.append(
+                        {
+                            "tool": chunk.get("tool"),
+                            "args": chunk.get("args"),
+                            "timestamp": chunk.get("timestamp"),
+                        }
+                    )
+                
+                # Collect text content for summary
+                if chunk_type == "text":
+                    last_text_content.append(chunk.get("content", ""))
+                
+                # Track final messages
+                if chunk_type == "done":
+                    final_messages = chunk.get("messages", [])
+                
+                # Stream to client
+                if chunk_type != "done":
+                    yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            
+            # Build summary
+            summary = "".join(last_text_content).strip()
+            if not summary:
+                summary = "Agent V2 执行完成"
+            
+            # Save conversation
+            persisted_messages = _build_persisted_turn_messages("completed", summary)
+            conversation_id = conversation_service.save_messages(
+                messages=persisted_messages,
+                conversation_id=active_conversation_id,
+            )
+            
+            # Send final event
+            done_data = {
+                "type": "done",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "timestamp": datetime.now().isoformat(),
+                "version": "v2",
+            }
+            yield f"data: {json.dumps(done_data, ensure_ascii=False)}\n\n"
+            
+        except Exception as e:
+            logger.exception("Agent V2 stream failed")
+            error_data = {
+                "type": "error",
+                "content": str(e),
+                "timestamp": datetime.now().isoformat(),
+            }
+            agent_run_events.append(_sanitize_chunk(error_data))
+            
+            # Save error state
+            persisted_messages = [
+                {
+                    "role": "user",
+                    "content": request.message,
+                    "timestamp": started_at,
+                    "file_context": request.file_context,
+                },
+                {
+                    "role": "assistant",
+                    "content": f"❌ Agent V2 执行失败：{str(e)}",
+                    "timestamp": datetime.now().isoformat(),
+                    "metadata": {
+                        "agent_run": {
+                            "started_at": started_at,
+                            "finished_at": datetime.now().isoformat(),
+                            "status": "error",
+                            "summary": f"❌ Agent V2 执行失败：{str(e)}",
+                            "tool_calls_count": len(tool_calls_log),
+                            "events": agent_run_events,
+                            "anchor_timestamp": started_at,
+                            "version": "v2",
                         }
                     },
                 },
