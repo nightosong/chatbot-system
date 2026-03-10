@@ -595,12 +595,26 @@
 
 /* Agent Mode Styles */
 .agent-live-panel {
-  margin: 0 0.95rem 0.35rem;
-  border-radius: 16px;
-  border: 1px solid rgba(191, 202, 219, 0.72);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(247, 250, 253, 0.98) 100%);
-  box-shadow: 0 12px 28px rgba(24, 39, 75, 0.08);
+  margin: 0 0.95rem 0.45rem;
+  border-radius: 24px;
+  border: 1px solid rgba(244, 203, 223, 0.86);
+  background:
+    radial-gradient(circle at top left, rgba(255, 239, 247, 0.9) 0%, rgba(255, 239, 247, 0) 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 246, 250, 0.98) 100%);
+  box-shadow: 0 18px 40px rgba(255, 146, 188, 0.14);
   overflow: hidden;
+  position: relative;
+}
+
+.agent-live-panel::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 72px;
+  bottom: 24px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(255, 141, 191, 0.38) 0%, rgba(194, 165, 255, 0.28) 55%, rgba(255, 206, 225, 0.12) 100%);
+  pointer-events: none;
 }
 
 .agent-runs-list {
@@ -628,9 +642,9 @@
 }
 
 .agent-chain-message .message-avatar {
-  background: linear-gradient(135deg, #ff8fb8 0%, #8e8cf7 55%, #63b7ff 100%);
-  border-color: rgba(154, 159, 246, 0.42);
-  box-shadow: 0 10px 22px rgba(113, 117, 231, 0.22);
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.95) 0 10%, rgba(255, 255, 255, 0) 11%), linear-gradient(135deg, #ff98c0 0%, #ff79b1 36%, #b88cff 100%);
+  border-color: rgba(244, 175, 209, 0.78);
+  box-shadow: 0 14px 28px rgba(240, 118, 173, 0.28);
 }
 
 .agent-chain-message .message-content {
@@ -655,10 +669,10 @@
 .agent-live-header {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(216, 224, 235, 0.92);
-  background: linear-gradient(180deg, rgba(251, 253, 255, 0.98) 0%, rgba(245, 248, 252, 0.96) 100%);
+  gap: 0.72rem;
+  padding: 1rem 1.08rem 0.96rem;
+  border-bottom: 1px solid rgba(247, 214, 229, 0.92);
+  background: linear-gradient(180deg, rgba(255, 251, 253, 0.98) 0%, rgba(255, 244, 248, 0.96) 100%);
   width: 100%;
   border-left: none;
   border-right: none;
@@ -671,8 +685,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  color: #8c9ab0;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: #b16791;
+  background: rgba(255, 236, 244, 0.95);
+  border: 1px solid rgba(245, 202, 221, 0.92);
   transition: transform 0.15s ease;
 }
 
@@ -688,23 +706,23 @@
 }
 
 .agent-live-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #243548;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #7e4662;
   letter-spacing: 0.01em;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .agent-live-subtitle {
-  font-size: 0.68rem;
-  color: #8b98ab;
-  font-weight: 500;
+  font-size: 0.69rem;
+  color: #b1879a;
+  font-weight: 600;
 }
 
 .agent-live-count {
-  font-size: 0.72rem;
-  color: #8d9db3;
-  font-weight: 600;
+  font-size: 0.71rem;
+  color: #ae8297;
+  font-weight: 700;
   margin-left: auto;
 }
 
@@ -718,30 +736,30 @@
 }
 
 .agent-live-status-running {
-  color: #215ea8;
-  background: rgba(223, 236, 252, 0.94);
-  border-color: rgba(157, 189, 232, 0.88);
+  color: #9c4c7c;
+  background: rgba(255, 233, 242, 0.96);
+  border-color: rgba(243, 194, 216, 0.92);
 }
 
 .agent-live-status-completed {
-  color: #26734d;
-  background: rgba(225, 244, 233, 0.94);
-  border-color: rgba(166, 216, 184, 0.92);
+  color: #8052a5;
+  background: rgba(247, 238, 255, 0.96);
+  border-color: rgba(225, 206, 250, 0.92);
 }
 
 .agent-live-status-error {
-  color: #c14343;
-  background: rgba(255, 233, 233, 0.95);
-  border-color: rgba(243, 182, 182, 0.92);
+  color: #c1436f;
+  background: rgba(255, 236, 241, 0.96);
+  border-color: rgba(247, 198, 214, 0.92);
 }
 
 .agent-live-steps {
   max-height: none;
   overflow: visible;
-  padding: 0.9rem 1rem 0.85rem;
+  padding: 1rem 1.08rem 0.95rem;
   display: flex;
   flex-direction: column;
-  gap: 0.48rem;
+  gap: 0.72rem;
 }
 
 .agent-timeline-step {
@@ -759,13 +777,13 @@
 }
 
 .agent-step-dot {
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  margin-top: 0.62rem;
-  border: 2px solid rgba(255, 255, 255, 0.98);
-  box-shadow: 0 0 0 1px rgba(172, 184, 200, 0.54);
-  background: #9aa8ba;
+  margin-top: 0.72rem;
+  border: 3px solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(247, 195, 217, 0.7), 0 6px 12px rgba(255, 149, 190, 0.16);
+  background: #d8a4be;
 }
 
 .step-dot-status {
@@ -819,10 +837,10 @@
 
 .agent-step-line {
   flex: 1;
-  width: 2px;
-  margin-top: 0.32rem;
+  width: 3px;
+  margin-top: 0.38rem;
   border-radius: 99px;
-  background: linear-gradient(to bottom, rgba(171, 184, 202, 0.65), rgba(215, 224, 235, 0.2));
+  background: linear-gradient(to bottom, rgba(255, 150, 194, 0.46), rgba(205, 172, 255, 0.26), rgba(255, 220, 233, 0.1));
 }
 
 .agent-live-footer {
@@ -836,14 +854,14 @@
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  padding: 0.46rem 0.7rem;
+  padding: 0.5rem 0.78rem;
   border-radius: 999px;
-  border: 1px solid rgba(204, 215, 229, 0.94);
-  background: rgba(248, 251, 254, 0.95);
-  color: #6f8096;
+  border: 1px solid rgba(246, 206, 221, 0.94);
+  background: rgba(255, 243, 248, 0.97);
+  color: #9e6c85;
   font-size: 0.71rem;
-  font-weight: 600;
-  box-shadow: 0 6px 16px rgba(28, 41, 64, 0.05);
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(255, 152, 194, 0.08);
   max-width: 100%;
 }
 
@@ -851,8 +869,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #5e83c4;
-  box-shadow: 0 0 0 4px rgba(94, 131, 196, 0.14);
+  background: #f071a7;
+  box-shadow: 0 0 0 4px rgba(240, 113, 167, 0.16);
   animation: agent-live-hint-pulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }
@@ -872,25 +890,26 @@
 
 .agent-step {
   position: relative;
-  border-radius: 12px;
-  border: 1px solid rgba(220, 227, 237, 0.94);
-  padding: 0.72rem 0.82rem 0.74rem;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 18px;
+  border: 1px solid rgba(245, 214, 228, 0.94);
+  padding: 0.82rem 0.92rem 0.86rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 247, 250, 0.9) 100%);
   flex: 1;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(255, 152, 194, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
 }
 
 .agent-step::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 12px 0 0 12px;
-  background: rgba(149, 165, 186, 0.55);
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 150, 194, 0.9) 0%, rgba(189, 145, 255, 0.8) 100%);
 }
 
 .agent-step-title-row {
@@ -918,14 +937,14 @@
 .agent-step-kind {
   display: inline-flex;
   align-items: center;
-  padding: 0.1rem 0.42rem;
+  padding: 0.14rem 0.48rem;
   border-radius: 999px;
-  font-size: 0.63rem;
-  font-weight: 700;
+  font-size: 0.62rem;
+  font-weight: 800;
   letter-spacing: 0.03em;
-  color: #516278;
-  background: rgba(235, 240, 246, 0.9);
-  border: 1px solid rgba(205, 215, 227, 0.94);
+  color: #8a5f76;
+  background: rgba(255, 240, 246, 0.92);
+  border: 1px solid rgba(246, 205, 220, 0.94);
 }
 
 .agent-step-kind.kind-tool_call {
@@ -966,10 +985,10 @@
 }
 
 .agent-step-title {
-  font-size: 0.82rem;
-  line-height: 1.28;
-  font-weight: 700;
-  color: #2d4056;
+  font-size: 0.83rem;
+  line-height: 1.3;
+  font-weight: 800;
+  color: #704d65;
   min-width: 0;
 }
 
@@ -983,8 +1002,8 @@
 
 .agent-step-time {
   font-size: 0.66rem;
-  color: #95a3b7;
-  font-weight: 600;
+  color: #bb8ea2;
+  font-weight: 700;
 }
 
 .agent-step-running {
@@ -1028,8 +1047,8 @@
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.72rem;
-  line-height: 1.45;
-  color: #566577;
+  line-height: 1.5;
+  color: #715b70;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
@@ -1487,28 +1506,29 @@
 }
 
 .agent-final-message {
-  margin: 0.2rem 1rem 1rem 2.1rem;
-  border: 1px solid rgba(208, 217, 229, 0.95);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(251, 253, 255, 0.98) 0%, rgba(246, 249, 253, 0.98) 100%);
+  margin: 0.28rem 1.08rem 1.08rem 2.35rem;
+  border: 1px solid rgba(245, 209, 225, 0.95);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 251, 253, 0.98) 0%, rgba(255, 244, 249, 0.98) 100%);
   overflow: hidden;
+  box-shadow: 0 12px 24px rgba(255, 152, 194, 0.08);
 }
 
 .agent-final-header {
-  padding: 0.52rem 0.8rem;
+  padding: 0.56rem 0.88rem;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.03em;
-  color: #465a73;
-  border-bottom: 1px solid rgba(217, 225, 235, 0.95);
-  background: rgba(244, 247, 251, 0.94);
+  color: #915970;
+  border-bottom: 1px solid rgba(247, 214, 229, 0.95);
+  background: rgba(255, 239, 246, 0.94);
 }
 
 .agent-final-content {
-  padding: 0.72rem 0.8rem 0.82rem;
+  padding: 0.8rem 0.88rem 0.9rem;
   font-size: 0.82rem;
-  line-height: 1.62;
-  color: #32465f;
+  line-height: 1.64;
+  color: #694c62;
   white-space: pre-wrap;
   word-break: break-word;
 }

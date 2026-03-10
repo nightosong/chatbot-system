@@ -28,16 +28,17 @@ const UserAvatarIcon = () => (
 );
 
 const AssistantAvatarIcon = () => (
-  <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M10 3.15V4.65" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
-    <path d="M7.25 4.85H12.75" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" opacity="0.9" />
-    <rect x="4.1" y="5.35" width="11.8" height="9.8" rx="4.2" fill="currentColor" opacity="0.12" />
-    <rect x="4.1" y="5.35" width="11.8" height="9.8" rx="4.2" stroke="currentColor" strokeWidth="1.4" />
-    <circle cx="7.75" cy="9.35" r="1.1" fill="currentColor" />
-    <circle cx="12.25" cy="9.35" r="1.1" fill="currentColor" />
-    <path d="M7.35 12.1C8 12.95 8.95 13.35 10 13.35C11.05 13.35 12 12.95 12.65 12.1" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-    <path d="M5.55 15.05V16.4" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-    <path d="M14.45 15.05V16.4" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M7.2 8.4C7.2 5.97 9.39 4 12 4C14.61 4 16.8 5.97 16.8 8.4V13.1C16.8 15.64 14.67 17.7 12 17.7C9.33 17.7 7.2 15.64 7.2 13.1V8.4Z" fill="currentColor" fillOpacity="0.18" />
+    <path d="M7.2 8.4C7.2 5.97 9.39 4 12 4C14.61 4 16.8 5.97 16.8 8.4V13.1C16.8 15.64 14.67 17.7 12 17.7C9.33 17.7 7.2 15.64 7.2 13.1V8.4Z" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M9 6.4L7.15 5.35" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+    <path d="M15 6.4L16.85 5.35" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+    <circle cx="10" cy="10.1" r="1.05" fill="currentColor" />
+    <circle cx="14" cy="10.1" r="1.05" fill="currentColor" />
+    <path d="M9.75 13.2C10.35 14 11.09 14.35 12 14.35C12.91 14.35 13.65 14 14.25 13.2" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+    <path d="M10.15 17.8L9.1 19.4" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+    <path d="M13.85 17.8L14.9 19.4" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+    <circle cx="18.2" cy="7.2" r="1" fill="currentColor" fillOpacity="0.7" />
   </svg>
 );
 

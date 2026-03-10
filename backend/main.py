@@ -403,9 +403,16 @@ async def agent_chat(request: AgentRequest):
         def _build_persisted_turn_messages(status: str, summary: str) -> List[dict]:
             finished_at = datetime.now().isoformat()
             history_offset = 1 + len(history)
-            current_turn_messages = [dict(msg) for msg in final_messages[history_offset:]] if final_messages else []
+            current_turn_messages = (
+                [dict(msg) for msg in final_messages[history_offset:]]
+                if final_messages
+                else []
+            )
 
-            if not current_turn_messages or current_turn_messages[0].get("role") != "user":
+            if (
+                not current_turn_messages
+                or current_turn_messages[0].get("role") != "user"
+            ):
                 current_turn_messages.insert(
                     0,
                     {
@@ -417,7 +424,9 @@ async def agent_chat(request: AgentRequest):
                 )
             elif not current_turn_messages[0].get("timestamp"):
                 current_turn_messages[0]["timestamp"] = started_at
-                if request.file_context and not current_turn_messages[0].get("file_context"):
+                if request.file_context and not current_turn_messages[0].get(
+                    "file_context"
+                ):
                     current_turn_messages[0]["file_context"] = request.file_context
 
             persisted_summary = (summary or "").strip()
@@ -428,11 +437,14 @@ async def agent_chat(request: AgentRequest):
                 "summary": persisted_summary,
                 "tool_calls_count": len(tool_calls_log),
                 "events": agent_run_events,
-                "anchor_timestamp": current_turn_messages[0].get("timestamp", started_at),
+                "anchor_timestamp": current_turn_messages[0].get(
+                    "timestamp", started_at
+                ),
             }
 
             assistant_indices = [
-                idx for idx, msg in enumerate(current_turn_messages)
+                idx
+                for idx, msg in enumerate(current_turn_messages)
                 if msg.get("role") == "assistant"
             ]
             if assistant_indices:
@@ -568,6 +580,7 @@ async def agent_chat(request: AgentRequest):
             error_data["conversation_id"] = conversation_id
             error_data["project_id"] = conversation_id
             yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
