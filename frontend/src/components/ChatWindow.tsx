@@ -124,22 +124,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     Array<{ runStartedAt: string; stepTimestamp: string; selectedAction: string }>
   >([]);
 
-  // Load conversation when conversationId changes
-  useEffect(() => {
-    if (conversationId) {
-      loadConversation(conversationId);
-    } else {
-      setMessages([]);
-      setFileContext(null);
-      setFileName(null);
-      setAgentRuns([]);
-      setActiveRunId(null);
-      setCollapsedRuns({});
-      runIdRef.current = 0;
-      stepIdRef.current = 0;
-    }
-  }, [conversationId]);
-
   // Auto-scroll to bottom
   useEffect(() => {
     scrollToBottom();
@@ -228,6 +212,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Load conversation when conversationId changes
+  useEffect(() => {
+    if (conversationId) {
+      loadConversation(conversationId);
+    } else {
+      setMessages([]);
+      setFileContext(null);
+      setFileName(null);
+      setAgentRuns([]);
+      setActiveRunId(null);
+      setCollapsedRuns({});
+      runIdRef.current = 0;
+      stepIdRef.current = 0;
+    }
+  }, [conversationId]);
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim() && !fileContext) return;
@@ -709,7 +709,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
-  const rehydrateAgentRunsFromMessages = (conversationMessages: Message[]): AgentRun[] => {
+  function rehydrateAgentRunsFromMessages(conversationMessages: Message[]): AgentRun[] {
     let nextRunId = 0;
 
     const normalizeDetail = (value: unknown): string => {
@@ -1084,7 +1084,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         return restoreRunFromPayload(agentRun, message);
       })
       .filter((run): run is AgentRun => run !== null);
-  };
+  }
+
 
   const inferMediaType = (url: string, subtype?: string): 'image' | 'video' => {
     const normalizedSubtype = (subtype || '').toLowerCase();
@@ -1934,15 +1935,18 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="agent-live-steps">
               {run.steps.map((step, index) => {
                 const isLast = index === run.steps.length - 1;
-                const isRunningStep =
-                  run.status === 'running' &&
-                  run.id === activeRunId &&
-                  isLast;
+                const activeStepIndex =
+                  run.status === 'running' && run.id === activeRunId
+                    ? run.steps.length - 1
+                    : null;
+                const isRunningStep = activeStepIndex === index;
+                const isCompletedStep = activeStepIndex === null ? true : index < activeStepIndex;
+                const isPendingStep = activeStepIndex !== null && index > activeStepIndex;
 
                 return (
                   <div
                     key={step.id}
-                    className={`agent-timeline-step ${isRunningStep ? 'is-running' : ''}`}
+                    className={`agent-timeline-step ${isRunningStep ? 'is-running' : ''} ${isCompletedStep ? 'is-completed' : ''} ${isPendingStep ? 'is-pending' : ''}`}
                   >
                     <div className="agent-step-rail">
                       <span className={`agent-step-dot step-dot-${step.type} ${isRunningStep ? 'dot-running' : ''}`}></span>
