@@ -1950,7 +1950,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                   >
                     <div className="agent-step-rail">
                       <span className={`agent-step-dot step-dot-${step.type} ${isRunningStep ? 'dot-running' : ''}`}></span>
-                      {!isLast && <span className="agent-step-line"></span>}
                     </div>
                     <div className={`agent-step agent-step-${step.type}`}>
                       <div className="agent-step-title-row">
