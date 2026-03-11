@@ -19,14 +19,15 @@ interface ModelSettingsProps {
 }
 
 const PLATFORM_OPTIONS = [
-  { value: 'openai', label: 'OpenAI GPT', icon: 'openai', baseUrl: '' },
-  { value: 'gemini', label: 'Google Gemini', icon: 'gemini', baseUrl: '' },
-  { value: 'skywork_router', label: 'Skywork Router', icon: 'skywork', baseUrl: 'https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions' },
-  { value: 'kimi', label: 'Moonshot Kimi', icon: 'kimi', baseUrl: 'https://api.moonshot.cn/v1' },
-  { value: 'qwen', label: '阿里通义千问', icon: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  { value: 'deepseek', label: 'DeepSeek', icon: 'deepseek', baseUrl: 'https://api.deepseek.com' },
-  { value: 'claude', label: 'Anthropic Claude', icon: 'claude', baseUrl: '' },
-  { value: 'doubao', label: '字节豆包', icon: 'doubao', baseUrl: '' },
+  { value: 'openai', label: 'OpenAI GPT', icon: 'openai', baseUrl: '', requiresBaseUrl: false },
+  { value: 'gemini', label: 'Google Gemini', icon: 'gemini', baseUrl: '', requiresBaseUrl: false },
+  { value: 'skywork_router', label: 'Skywork Router', icon: 'skywork', baseUrl: '', requiresBaseUrl: true },
+  { value: 'openai_like', label: 'OpenAI-Like', icon: 'openai', baseUrl: '', requiresBaseUrl: true },
+  { value: 'kimi', label: 'Moonshot Kimi', icon: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', requiresBaseUrl: false },
+  { value: 'qwen', label: '阿里通义千问', icon: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', requiresBaseUrl: false },
+  { value: 'deepseek', label: 'DeepSeek', icon: 'deepseek', baseUrl: 'https://api.deepseek.com', requiresBaseUrl: false },
+  { value: 'claude', label: 'Anthropic Claude', icon: 'claude', baseUrl: '', requiresBaseUrl: false },
+  { value: 'doubao', label: '字节豆包', icon: 'doubao', baseUrl: '', requiresBaseUrl: false },
 ];
 
 const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
@@ -55,13 +56,17 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
     }
 
     const platformOption = PLATFORM_OPTIONS.find(p => p.value === newModel.platform);
+    if (platformOption?.requiresBaseUrl && !newModel.baseUrl) {
+      alert('请填写 Base URL！');
+      return;
+    }
 
     const addedModel = modelConfigService.add({
       platform: newModel.platform!,
       apiKey: newModel.apiKey!,
       modelName: newModel.modelName!,
       enabled: newModel.enabled ?? true,
-      baseUrl: platformOption?.baseUrl || '',
+      baseUrl: newModel.baseUrl || platformOption?.baseUrl || '',
     });
 
     setModels([...models, addedModel]);
@@ -269,6 +274,19 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onClose }) => {
                   className="form-input"
                 />
               </div>
+
+              {selectedPlatformOption.requiresBaseUrl && (
+                <div className="form-group">
+                  <label>Base URL</label>
+                  <input
+                    type="text"
+                    value={newModel.baseUrl}
+                    onChange={(e) => setNewModel({ ...newModel, baseUrl: e.target.value })}
+                    placeholder="例如: https://api.example.com/v1"
+                    className="form-input"
+                  />
+                </div>
+              )}
 
               <div className="form-actions">
                 <button className="btn btn-cancel" onClick={() => setIsAddingNew(false)}>

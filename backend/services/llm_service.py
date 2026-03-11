@@ -8,10 +8,11 @@ Supports multiple providers: Gemini, OpenAI, DeepSeek, Kimi, QWen, etc.
 """
 
 import os
-import requests
 from typing import Any
 from google import genai  # type: ignore
 from openai import OpenAI
+
+from services.llm.skywork_router import SkyworkRouter
 
 
 class LLMService:
@@ -32,9 +33,10 @@ class LLMService:
             "default_model": "qwen-turbo",
         },
         "skywork_router": {
-            "base_url": "https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions",
+            "base_url": None,
             "default_model": "gpt-4.1",
         },
+        "openai_like": {"base_url": None, "default_model": "gpt-3.5-turbo"},
         "openai": {"base_url": None, "default_model": "gpt-3.5-turbo"},
         "gemini": {"base_url": None, "default_model": "gemini-1.5-flash"},
     }
@@ -263,6 +265,7 @@ class LLMService:
                 return await self._generate_skywork_router_response(
                     api_key,
                     model_name,
+                    base_url,
                     message,
                     conversation_history,
                     file_context,
@@ -289,62 +292,29 @@ class LLMService:
         self,
         api_key: str,
         model_name: str,
+        base_url: str | None,
         message: str,
         conversation_history: list[dict],
         file_context: str | None,
         language: str | None = None,
     ) -> str:
-        """使用 Skywork Router 生成响应（参考 Go 实现）"""
-        # API URL
-        url = "https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions"
-
-        # 构建请求头（使用 app_key 而不是 Authorization）
-        headers = {
-            "Content-Type": "application/json",
-            "app_key": api_key,  # 关键：使用 app_key header
-        }
-
-        # 构建 messages（OpenAI 兼容格式）
+        """使用 Skywork Router 生成响应"""
         messages = self._build_messages_for_openai(
             message, conversation_history, file_context, language
         )
+        router = SkyworkRouter(base_url)
+        resp_json = router.chat_completion(
+            api_key=api_key,
+            model_name=model_name,
+            messages=messages,
+            temperature=0.7,
+        )
 
-        # 构建请求体
-        data = {
-            "model": model_name,
-            "messages": messages,
-            "temperature": 0.7,
-            "top_p": 1.0,
-            "stream": False,
-        }
+        if "choices" not in resp_json or len(resp_json["choices"]) == 0:
+            raise Exception("Empty choices in Skywork Router response")
 
-        try:
-            # 发送请求
-            response = requests.post(url, headers=headers, json=data, timeout=60)
-
-            # 检查状态码
-            if response.status_code != 200:
-                error_msg = f"Skywork Router API error: status={response.status_code}, body={response.text}"
-                print(f"❌ {error_msg}")
-                raise Exception(error_msg)
-
-            # 解析响应
-            resp_json = response.json()
-
-            # 提取响应内容
-            if "choices" not in resp_json or len(resp_json["choices"]) == 0:
-                raise Exception("Empty choices in Skywork Router response")
-
-            content = resp_json["choices"][0]["message"]["content"]
-
-            return content or ""
-
-        except requests.exceptions.Timeout:
-            raise Exception("Skywork Router API timeout after 60 seconds")
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Skywork Router API request failed: {str(e)}")
-        except (KeyError, IndexError) as e:
-            raise Exception(f"Failed to parse Skywork Router response: {str(e)}")
+        content = resp_json["choices"][0]["message"]["content"]
+        return content or ""
 
     async def _generate_gemini_response(
         self,
@@ -395,6 +365,6 @@ class LLMService:
             model=model_name,
             messages=messages,  # type: ignore
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=20000,
         )
         return response.choices[0].message.content or ""

@@ -24,6 +24,7 @@ from typing import Optional, Dict, Any, AsyncGenerator, List
 from pathlib import Path
 
 from services.permission_service import PermissionService
+from services.llm.skywork_router import SkyworkRouter
 
 
 class CodeService:
@@ -1057,7 +1058,6 @@ Remember: You can see and modify files, run commands, but always prioritize safe
         Skywork Router uses OpenAI-compatible API but with app_key authentication
         Returns dict with either 'content' or 'tool_calls'
         """
-        import requests
 
         # Validate model_config
         if not model_config:
@@ -1067,6 +1067,7 @@ Remember: You can see and modify files, run commands, but always prioritize safe
 
         api_key = model_config.get("api_key")
         model_name = model_config.get("model_name")
+        base_url = model_config.get("base_url")
 
         # Validate required fields
         if not api_key:
@@ -1079,39 +1080,15 @@ Remember: You can see and modify files, run commands, but always prioritize safe
             }
 
         try:
-            # Skywork Router endpoint
-            url = "https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions"
-
-            # Skywork Router uses app_key header instead of Authorization
-            headers = {
-                "Content-Type": "application/json",
-                "app_key": api_key,
-            }
-
-            # Prepare API parameters (OpenAI-compatible format)
-            data = {
-                "model": model_name,
-                "messages": messages,
-                "temperature": 0.7,
-                "stream": False,
-            }
-
-            # Add tools if available
-            if tools:
-                data["tools"] = tools
-                data["tool_choice"] = "auto"
-
-            # Call API
-            response = requests.post(url, headers=headers, json=data, timeout=60)
-
-            # Check status code
-            if response.status_code != 200:
-                return {
-                    "content": f"Skywork Router API error: status={response.status_code}, body={response.text}"
-                }
-
-            # Parse response
-            resp_json = response.json()
+            router = SkyworkRouter(base_url)
+            resp_json = router.chat_completion(
+                api_key=api_key,
+                model_name=model_name,
+                messages=messages,
+                tools=tools or None,
+                tool_choice="auto" if tools else None,
+                temperature=0.7,
+            )
 
             # Extract response
             if "choices" not in resp_json or len(resp_json["choices"]) == 0:
@@ -1140,10 +1117,6 @@ Remember: You can see and modify files, run commands, but always prioritize safe
             # Text response
             return {"content": message_obj.get("content", "")}
 
-        except requests.exceptions.Timeout:
-            return {"content": "Skywork Router API timeout after 60 seconds"}
-        except requests.exceptions.RequestException as e:
-            return {"content": f"Skywork Router request failed: {str(e)}"}
         except Exception as e:
             import traceback
 

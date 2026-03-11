@@ -5,12 +5,12 @@ Provides streaming responses and tool calling capabilities
 
 import json
 import asyncio
-import requests
 import os
 import threading
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
 from services.skill_manager import SkillManager
+from services.llm.skywork_router import SkyworkRouter
 
 
 class AgentService:
@@ -254,11 +254,14 @@ class AgentService:
 
                 if selected_skill_name_set:
                     skill_tools = [
-                        tool for tool in skill_tools
-                        if tool.get("function", {}).get("name") in selected_skill_name_set
+                        tool
+                        for tool in skill_tools
+                        if tool.get("function", {}).get("name")
+                        in selected_skill_name_set
                     ]
                     skill_summaries = [
-                        skill for skill in skill_summaries
+                        skill
+                        for skill in skill_summaries
                         if skill.get("name") in selected_skill_name_set
                     ]
 
@@ -295,6 +298,7 @@ class AgentService:
                 async for chunk in self._generate_skywork_router_stream(
                     api_key,
                     model_name,
+                    base_url,
                     messages,
                     tools,
                     max_iterations,
@@ -537,25 +541,22 @@ class AgentService:
             }
 
         # Return done with final messages (excluding system message for conversation history)
-        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        conversation_messages = [
+            msg for msg in current_messages if msg.get("role") != "system"
+        ]
         yield {"type": "done", "messages": conversation_messages}
 
     async def _generate_skywork_router_stream(
         self,
         api_key: str,
         model_name: str,
+        base_url: str | None,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         max_iterations: int,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using Skywork Router with tool calling"""
-        import requests
-
-        url = "https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "app_key": api_key,
-        }
+        router = SkyworkRouter(base_url)
 
         current_messages = messages.copy()
         iteration = 0
@@ -563,30 +564,15 @@ class AgentService:
         while iteration < max_iterations:
             iteration += 1
 
-            # Build request data
-            data = {
-                "model": model_name,
-                "messages": current_messages,
-                "temperature": 0.7,
-                "top_p": 1.0,
-                "stream": False,  # Skywork Router 使用同步调用
-            }
-
-            # Add tools if available
-            if tools:
-                data["tools"] = tools
-                data["tool_choice"] = "auto"
-
             try:
-                # Call API
-                response = requests.post(url, headers=headers, json=data, timeout=60)
-
-                if response.status_code != 200:
-                    error_msg = f"Skywork Router API error: status={response.status_code}, body={response.text}"
-                    yield {"type": "error", "content": error_msg}
-                    break
-
-                resp_json = response.json()
+                resp_json = router.chat_completion(
+                    api_key=api_key,
+                    model_name=model_name,
+                    messages=current_messages,
+                    tools=tools or None,
+                    tool_choice="auto" if tools else None,
+                    temperature=0.7,
+                )
 
                 if "choices" not in resp_json or len(resp_json["choices"]) == 0:
                     yield {"type": "error", "content": "Empty choices in response"}
@@ -597,21 +583,16 @@ class AgentService:
                 content = message.get("content", "")
                 tool_calls_data = message.get("tool_calls", [])
 
-                # 模拟流式输出文本内容
                 if content:
-                    # 按字符或词组分块输出，模拟流式效果
-                    chunk_size = 10  # 每次输出10个字符
+                    chunk_size = 10
                     for i in range(0, len(content), chunk_size):
                         chunk = content[i : i + chunk_size]
                         yield {"type": "text", "content": chunk}
-                        # 添加小延迟以模拟流式效果
                         await asyncio.sleep(0.01)
 
-                # If no tool calls, we're done
                 if not tool_calls_data:
                     break
 
-                # Process tool calls
                 assistant_message = {
                     "role": "assistant",
                     "content": content or None,
@@ -619,7 +600,6 @@ class AgentService:
                 }
                 current_messages.append(assistant_message)
 
-                # Execute each tool call
                 for tool_call in tool_calls_data:
                     tool_name = tool_call["function"]["name"]
                     tool_args_str = tool_call["function"]["arguments"]
@@ -635,7 +615,6 @@ class AgentService:
                         "args": tool_args,
                     }
 
-                    # Execute tool
                     try:
                         result = await self._execute_tool(tool_name, tool_args)
                         result_str = self._serialize_tool_result(result)
@@ -648,7 +627,6 @@ class AgentService:
                         "result": result_str,
                     }
 
-                    # Add tool result to messages
                     current_messages.append(
                         {
                             "role": "tool",
@@ -657,20 +635,8 @@ class AgentService:
                         }
                     )
 
-            except requests.exceptions.Timeout:
-                yield {
-                    "type": "error",
-                    "content": "Skywork Router API timeout after 60 seconds",
-                }
-                break
-            except requests.exceptions.RequestException as e:
-                yield {
-                    "type": "error",
-                    "content": f"Skywork Router API request failed: {str(e)}",
-                }
-                break
             except Exception as e:
-                yield {"type": "error", "content": f"Unexpected error: {str(e)}"}
+                yield {"type": "error", "content": f"Skywork Router error: {str(e)}"}
                 break
 
         # If we hit max iterations, yield a warning
@@ -681,7 +647,9 @@ class AgentService:
             }
 
         # Return done with final messages (excluding system message for conversation history)
-        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        conversation_messages = [
+            msg for msg in current_messages if msg.get("role") != "system"
+        ]
         yield {"type": "done", "messages": conversation_messages}
 
     async def _generate_gemini_stream(
@@ -726,7 +694,9 @@ class AgentService:
                     yield {"type": "text", "content": chunk.text}
 
             # Return done with messages
-            conversation_messages = [msg for msg in messages if msg.get("role") != "system"]
+            conversation_messages = [
+                msg for msg in messages if msg.get("role") != "system"
+            ]
             yield {"type": "done", "messages": conversation_messages}
 
         except Exception as e:
@@ -754,9 +724,7 @@ class AgentService:
         # In practice, you might need to adapt based on Gemini's actual tool calling API
         return tools
 
-    async def _execute_tool(
-        self, tool_name: str, tool_args: Dict[str, Any]
-    ) -> Any:
+    async def _execute_tool(self, tool_name: str, tool_args: Dict[str, Any]) -> Any:
         """Execute a tool by name.
 
         This method tries to execute the tool in the following order:

@@ -14,17 +14,19 @@ Key differences from V1:
 - Sandbox is only used for skill scripts (optional)
 """
 
+import asyncio
 import json
 import os
 import threading
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
 from services.skill_manager import SkillManager
+from services.llm.skywork_router import SkyworkRouter
 
 
 class AgentServiceV2:
     """Agent service with proper Skills architecture.
-    
+
     Architecture:
     1. System prompt contains skill metadata (name + description)
     2. When a skill is needed, its SKILL.md content is loaded into context
@@ -39,7 +41,7 @@ class AgentServiceV2:
     def __init__(self, mcp_client=None, skill_manager: SkillManager | None = None):
         """
         Initialize Agent Service V2
-        
+
         Args:
             mcp_client: MCP client for tool calling
             skill_manager: Skill manager for loading skill metadata and content
@@ -49,7 +51,7 @@ class AgentServiceV2:
         self._current_model_config: Optional[Dict[str, Any]] = None
         self._current_mcp_config: Optional[Dict[str, Any]] = None
         self._default_system_prompt = self._load_default_system_prompt()
-        
+
         # Track activated skills in current conversation
         self._activated_skills: set[str] = set()
 
@@ -120,56 +122,52 @@ You have access to tools for:
 - Calling MCP tools (for actual operations)
 """
 
-    def _build_skill_metadata_section(
-        self, 
-        skills: List[Dict[str, Any]]
-    ) -> str:
+    def _build_skill_metadata_section(self, skills: List[Dict[str, Any]]) -> str:
         """Build skill metadata section for system prompt (Level 1: Progressive Disclosure)."""
         if not skills:
             return ""
-        
+
         sections = ["# Available Skills"]
         sections.append("These skills provide specialized workflows:\n")
-        
+
         for skill in skills:
             name = skill.get("name", "")
             description = skill.get("description", "")
             metadata = skill.get("metadata", {})
             skill_path = metadata.get("path", "")
-            
+
             if not name:
                 continue
-            
+
             sections.append(f"## {name}")
             sections.append(f"**Description**: {description}")
             if skill_path:
                 sections.append(f"**Location**: {skill_path}/SKILL.md")
             sections.append("")  # blank line
-        
-        sections.append("\n**To use a skill**: Read its SKILL.md file and follow the workflow instructions.")
+
+        sections.append(
+            "\n**To use a skill**: Read its SKILL.md file and follow the workflow instructions."
+        )
         return "\n".join(sections)
 
-    def _build_mcp_tools_section(
-        self,
-        tools: List[Dict[str, Any]]
-    ) -> str:
+    def _build_mcp_tools_section(self, tools: List[Dict[str, Any]]) -> str:
         """Build MCP tools section for system prompt."""
         if not tools:
             return ""
-        
+
         sections = ["# Available MCP Tools"]
         sections.append("These are atomic operations you can call:\n")
-        
+
         for tool in tools:
             function_info = tool.get("function", {})
             name = function_info.get("name", "")
             description = function_info.get("description", "")
-            
+
             if not name:
                 continue
-            
+
             sections.append(f"- **{name}**: {description}")
-        
+
         return "\n".join(sections)
 
     async def generate_stream(
@@ -185,7 +183,7 @@ You have access to tools for:
         max_iterations: int = 15,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming agent response with proper skill architecture.
-        
+
         Yields:
             - {"type": "text", "content": "..."}
             - {"type": "tool_call", "tool": "...", "args": {...}}
@@ -230,10 +228,11 @@ You have access to tools for:
             if enable_skills and self.skill_manager:
                 selected_skill_name_set = set(selected_skill_names or [])
                 all_skills = self.skill_manager.list_skills()
-                
+
                 if selected_skill_name_set:
                     skill_metadata = [
-                        skill for skill in all_skills
+                        skill
+                        for skill in all_skills
                         if skill.get("name") in selected_skill_name_set
                     ]
                 else:
@@ -261,7 +260,7 @@ You have access to tools for:
                     yield chunk
             elif provider == "skywork_router":
                 async for chunk in self._generate_skywork_router_stream(
-                    api_key, model_name, messages, all_tools, max_iterations
+                    api_key, model_name, base_url, messages, all_tools, max_iterations
                 ):
                     if chunk.get("type") == "done" and "messages" in chunk:
                         final_messages = chunk["messages"]
@@ -292,12 +291,12 @@ You have access to tools for:
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Absolute or relative path to file"
+                                "description": "Absolute or relative path to file",
                             }
                         },
-                        "required": ["path"]
-                    }
-                }
+                        "required": ["path"],
+                    },
+                },
             },
             {
                 "type": "function",
@@ -307,15 +306,12 @@ You have access to tools for:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {
-                                "type": "string",
-                                "description": "Directory path"
-                            }
+                            "path": {"type": "string", "description": "Directory path"}
                         },
-                        "required": ["path"]
-                    }
-                }
-            }
+                        "required": ["path"],
+                    },
+                },
+            },
         ]
 
     def _build_messages(
@@ -450,9 +446,13 @@ You have access to tools for:
 
                             if tc.function:
                                 if tc.function.name:
-                                    current_tool_call["function"]["name"] = tc.function.name
+                                    current_tool_call["function"][
+                                        "name"
+                                    ] = tc.function.name
                                 if tc.function.arguments:
-                                    current_tool_call["function"]["arguments"] += tc.function.arguments
+                                    current_tool_call["function"][
+                                        "arguments"
+                                    ] += tc.function.arguments
 
             if current_tool_call:
                 tool_calls.append(current_tool_call)
@@ -508,26 +508,22 @@ You have access to tools for:
                 "content": "\n\n[Reached maximum tool calling iterations]",
             }
 
-        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        conversation_messages = [
+            msg for msg in current_messages if msg.get("role") != "system"
+        ]
         yield {"type": "done", "messages": conversation_messages}
 
     async def _generate_skywork_router_stream(
         self,
         api_key: str,
         model_name: str,
+        base_url: str | None,
         messages: List[Dict[str, Any]],
         tools: List[Dict[str, Any]],
         max_iterations: int,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate streaming response using Skywork Router."""
-        import requests
-        import asyncio
-
-        url = "https://gpt-us.singularity-ai.com/gpt-proxy/router/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "app_key": api_key,
-        }
+        router = SkyworkRouter(base_url)
 
         current_messages = messages.copy()
         iteration = 0
@@ -535,27 +531,15 @@ You have access to tools for:
         while iteration < max_iterations:
             iteration += 1
 
-            data = {
-                "model": model_name,
-                "messages": current_messages,
-                "temperature": 0.7,
-                "top_p": 1.0,
-                "stream": False,
-            }
-
-            if tools:
-                data["tools"] = tools
-                data["tool_choice"] = "auto"
-
             try:
-                response = requests.post(url, headers=headers, json=data, timeout=60)
-
-                if response.status_code != 200:
-                    error_msg = f"Skywork Router API error: status={response.status_code}"
-                    yield {"type": "error", "content": error_msg}
-                    break
-
-                resp_json = response.json()
+                resp_json = router.chat_completion(
+                    api_key=api_key,
+                    model_name=model_name,
+                    messages=current_messages,
+                    tools=tools or None,
+                    tool_choice="auto" if tools else None,
+                    temperature=0.7,
+                )
 
                 if "choices" not in resp_json or len(resp_json["choices"]) == 0:
                     yield {"type": "error", "content": "Empty choices in response"}
@@ -618,11 +602,8 @@ You have access to tools for:
                         }
                     )
 
-            except requests.exceptions.Timeout:
-                yield {"type": "error", "content": "API timeout"}
-                break
             except Exception as e:
-                yield {"type": "error", "content": f"Error: {str(e)}"}
+                yield {"type": "error", "content": f"Skywork Router error: {str(e)}"}
                 break
 
         if iteration >= max_iterations:
@@ -631,7 +612,9 @@ You have access to tools for:
                 "content": "\n\n[Reached maximum tool calling iterations]",
             }
 
-        conversation_messages = [msg for msg in current_messages if msg.get("role") != "system"]
+        conversation_messages = [
+            msg for msg in current_messages if msg.get("role") != "system"
+        ]
         yield {"type": "done", "messages": conversation_messages}
 
     async def _generate_gemini_stream(
@@ -665,7 +648,9 @@ You have access to tools for:
                 if chunk.text:
                     yield {"type": "text", "content": chunk.text}
 
-            conversation_messages = [msg for msg in messages if msg.get("role") != "system"]
+            conversation_messages = [
+                msg for msg in messages if msg.get("role") != "system"
+            ]
             yield {"type": "done", "messages": conversation_messages}
 
         except Exception as e:
@@ -710,20 +695,13 @@ You have access to tools for:
             if not os.path.isabs(path):
                 if self.skill_manager:
                     path = os.path.join(self.skill_manager.skills_root, path)
-            
+
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
-            
-            return {
-                "success": True,
-                "path": path,
-                "content": content
-            }
+
+            return {"success": True, "path": path, "content": content}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to read file: {str(e)}"
-            }
+            return {"success": False, "error": f"Failed to read file: {str(e)}"}
 
     async def _list_directory(self, path: str) -> Dict[str, Any]:
         """List directory contents."""
@@ -731,19 +709,12 @@ You have access to tools for:
             if not os.path.isabs(path):
                 if self.skill_manager:
                     path = os.path.join(self.skill_manager.skills_root, path)
-            
+
             entries = os.listdir(path)
-            
-            return {
-                "success": True,
-                "path": path,
-                "entries": entries
-            }
+
+            return {"success": True, "path": path, "entries": entries}
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to list directory: {str(e)}"
-            }
+            return {"success": False, "error": f"Failed to list directory: {str(e)}"}
 
     def _serialize_tool_result(self, result: Any) -> str:
         """Serialize tool result to JSON."""

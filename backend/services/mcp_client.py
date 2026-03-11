@@ -22,6 +22,7 @@ class MCPClient:
                         "url": "...",
                         "transport": "sse",
                     },
+                    "tools": ["tool_a", "tool_b"],
                     "_meta": {
                         "user_id": "...",
                         "project_id": "...",
@@ -52,13 +53,16 @@ class MCPClient:
         # Query each MCP server
         async with Client(self.servers_config) as mcp_client:
             tools = await mcp_client.list_tools()
+            allowed_tools = set(self.servers_config.get("tools") or [])
+            if allowed_tools:
+                tools = [tool for tool in tools if tool.name in allowed_tools]
             tools_schema = [
                 {
                     "type": "function",
                     "function": {
                         "name": tool.name,
                         "description": tool.description,
-                        "parameters": tool.inputSchema.get("properties", {}),
+                        "parameters": tool.inputSchema,
                     },
                 }
                 for tool in tools

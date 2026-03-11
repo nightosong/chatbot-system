@@ -9,8 +9,6 @@ import { Conversation, ChatMode } from './types';
 import { createConversation, getConversations } from './services/api';
 import { agentConfigService } from './services/agentConfig';
 
-const ACTIVE_PROJECT_STORAGE_KEY = 'chatbot-system.active-project-id';
-
 const getConversationIdFromPath = (): string | null => {
   const match = window.location.pathname.match(/^\/conversation\/([^/]+)$/);
   return match ? decodeURIComponent(match[1]) : null;
@@ -24,7 +22,7 @@ const buildConversationPath = (conversationId: string | null): string => {
 function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(
-    () => getConversationIdFromPath() || localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY)
+    () => getConversationIdFromPath()
   );
   const [showHistory, setShowHistory] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>(() => agentConfigService.getMode());
@@ -38,8 +36,7 @@ function App() {
   useEffect(() => {
     const handlePopState = () => {
       const routeConversationId = getConversationIdFromPath();
-      const fallbackConversationId = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
-      setCurrentConversationId(routeConversationId || fallbackConversationId);
+      setCurrentConversationId(routeConversationId);
       setShowHistory(false);
       setChatKey((prev) => prev + 1);
     };
@@ -52,14 +49,12 @@ function App() {
     const routeConversationId = getConversationIdFromPath();
 
     if (currentConversationId) {
-      localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, currentConversationId);
       if (routeConversationId !== currentConversationId) {
         window.history.replaceState({}, '', buildConversationPath(currentConversationId));
       }
       return;
     }
 
-    localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
     if (window.location.pathname !== '/') {
       window.history.replaceState({}, '', '/');
     }
@@ -73,7 +68,6 @@ function App() {
     );
 
     if (!exists) {
-      localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
       window.history.replaceState({}, '', '/');
       setCurrentConversationId(null);
     }
@@ -97,7 +91,6 @@ function App() {
         const withoutDuplicate = prev.filter((item) => item.conversation_id !== nextConversationId);
         return [created, ...withoutDuplicate];
       });
-      localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, nextConversationId);
       window.history.pushState({}, '', buildConversationPath(nextConversationId));
       setCurrentConversationId(nextConversationId);
       setShowHistory(false);
@@ -111,7 +104,6 @@ function App() {
   };
 
   const handleSelectConversation = (conversationId: string) => {
-    localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, conversationId);
     window.history.pushState({}, '', buildConversationPath(conversationId));
     setCurrentConversationId(conversationId);
     setShowHistory(false);
@@ -122,13 +114,11 @@ function App() {
   };
 
   const handleConversationIdChange = (id: string) => {
-    localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, id);
     window.history.pushState({}, '', buildConversationPath(id));
     setCurrentConversationId(id);
   };
 
   const handleGoHome = () => {
-    localStorage.removeItem(ACTIVE_PROJECT_STORAGE_KEY);
     window.history.pushState({}, '', '/');
     setCurrentConversationId(null);
     setShowHistory(false);
