@@ -9,13 +9,14 @@ import requests
 class SkyworkRouter:
     """Skywork Router client for chat completions (stream + non-stream)."""
 
-    DEFAULT_ROUTER_URL = "gpt-proxy/router/chat/completions"
+    DEFAULT_ROUTER_URL = "gpt-proxy/chat/completions"
 
     # Hard-coded model -> router_url mapping
     MODEL_ROUTER: Dict[str, str] = {
         "gpt-4.1": DEFAULT_ROUTER_URL,
         "gpt-4.1-mini": DEFAULT_ROUTER_URL,
         "gpt-4o": DEFAULT_ROUTER_URL,
+        "gpt-5": "gpt-proxy/azure/chat/completions",
     }
 
     def __init__(self, base_url: Optional[str] = None):

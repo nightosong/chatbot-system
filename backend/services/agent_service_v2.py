@@ -18,9 +18,10 @@ import asyncio
 import json
 import os
 import threading
+from pathlib import Path
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai import OpenAI
-from services.skill_manager import SkillManager
+from services.skill_manager import SkillManager, Skill
 from services.llm.skywork_router import SkyworkRouter
 
 
@@ -51,6 +52,7 @@ class AgentServiceV2:
         self._current_model_config: Optional[Dict[str, Any]] = None
         self._current_mcp_config: Optional[Dict[str, Any]] = None
         self._default_system_prompt = self._load_default_system_prompt()
+        self._active_tools: Optional[List[Dict[str, Any]]] = None
 
         # Track activated skills in current conversation
         self._activated_skills: set[str] = set()
@@ -221,7 +223,11 @@ You have access to tools for:
 
             # Add file system tools for skill access
             filesystem_tools = self._get_filesystem_tools()
+            skill_internal_tools = self._get_skill_internal_tools()
             all_tools = mcp_tools + filesystem_tools
+
+            if self._activated_skills:
+                all_tools = all_tools + skill_internal_tools
 
             # Get skill metadata (for system prompt only)
             skill_metadata: List[Dict[str, Any]] = []
@@ -238,6 +244,10 @@ You have access to tools for:
                 else:
                     skill_metadata = all_skills
 
+            if not self._activated_skills and selected_skill_names:
+                self._activated_skills.update(selected_skill_names)
+                all_tools = all_tools + skill_internal_tools
+
             # Build messages with proper architecture
             messages = self._build_messages(
                 message,
@@ -247,6 +257,8 @@ You have access to tools for:
                 all_tools,
                 skill_metadata,
             )
+
+            self._active_tools = all_tools
 
             final_messages = []
 
@@ -314,6 +326,51 @@ You have access to tools for:
             },
         ]
 
+    def _get_skill_internal_tools(self) -> List[Dict[str, Any]]:
+        """Get tools available only after a skill is activated."""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "skill_read_file",
+                    "description": "Read a file inside the active skill's references directory",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string",
+                                "description": "Relative path under references/ or SKILL.md",
+                            }
+                        },
+                        "required": ["path"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "skill_run_scripts",
+                    "description": "Run a script inside the active skill's scripts directory",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "script": {
+                                "type": "string",
+                                "description": "Script filename under scripts/",
+                            },
+                            "args": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Optional script arguments",
+                                "default": [],
+                            },
+                        },
+                        "required": ["script"],
+                    },
+                },
+            },
+        ]
+
     def _build_messages(
         self,
         message: str,
@@ -374,6 +431,19 @@ You have access to tools for:
 
                 if content or "tool_calls" in history_msg:
                     messages.append(history_msg)
+
+        # Inject active skill instructions as assistant context
+        if self._activated_skills and self.skill_manager:
+            for skill_name in sorted(self._activated_skills):
+                skill = self.skill_manager.get_skill(skill_name)
+                if not skill:
+                    continue
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": f"[Active Skill: {skill.name}]\n{skill.content}",
+                    }
+                )
 
         # Add current message
         messages.append({"role": "user", "content": message})
@@ -677,6 +747,12 @@ You have access to tools for:
             return await self._read_file(tool_args.get("path", ""))
         elif tool_name == "list_directory":
             return await self._list_directory(tool_args.get("path", ""))
+        elif tool_name == "skill_read_file":
+            return self._read_active_skill_file(tool_args.get("path", ""))
+        elif tool_name == "skill_run_scripts":
+            return await self._run_active_skill_script(
+                tool_args.get("script", ""), tool_args.get("args", [])
+            )
 
         # Handle MCP tools
         if self.mcp_client:
@@ -715,6 +791,29 @@ You have access to tools for:
             return {"success": True, "path": path, "entries": entries}
         except Exception as e:
             return {"success": False, "error": f"Failed to list directory: {str(e)}"}
+
+    def _read_active_skill_file(self, path: str) -> Dict[str, Any]:
+        skill = self._get_single_active_skill()
+        if not skill:
+            return {"success": False, "error": "No active skill"}
+
+        return self.skill_manager.read_skill_reference(skill, path)  # type: ignore
+
+    async def _run_active_skill_script(
+        self, script: str, args: List[str]
+    ) -> Dict[str, Any]:
+        skill = self._get_single_active_skill()
+        if not skill:
+            return {"success": False, "error": "No active skill"}
+
+        return await self.skill_manager.run_skill_script(skill, script, args)  # type: ignore
+
+    def _get_single_active_skill(self) -> Optional[Skill]:
+        if not self._activated_skills or not self.skill_manager:
+            return None
+
+        skill_name = sorted(self._activated_skills)[0]
+        return self.skill_manager.get_skill(skill_name)
 
     def _serialize_tool_result(self, result: Any) -> str:
         """Serialize tool result to JSON."""

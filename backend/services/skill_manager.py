@@ -737,6 +737,91 @@ class SkillManager:
             mcp_config=mcp_config,
         )
 
+    def read_skill_reference(self, skill: Skill, relative_path: str) -> Dict[str, Any]:
+        base_dir = skill.directory
+        target_path = relative_path.strip()
+
+        if not target_path:
+            return {"success": False, "error": "Path is required"}
+
+        if target_path.lower() == "skill.md" or target_path.lower().endswith("/skill.md"):
+            file_path = base_dir / "SKILL.md"
+        else:
+            file_path = base_dir / "references" / target_path
+
+        try:
+            resolved = file_path.resolve()
+            if not str(resolved).startswith(str(base_dir.resolve())):
+                return {"success": False, "error": "Access denied: Path outside skill"}
+
+            if not resolved.exists() or not resolved.is_file():
+                return {"success": False, "error": f"File not found: {relative_path}"}
+
+            content = resolved.read_text(encoding="utf-8")
+            return {"success": True, "path": str(resolved), "content": content}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to read skill file: {str(e)}"}
+
+    async def run_skill_script(
+        self, skill: Skill, script_name: str, args: List[str] | None = None
+    ) -> Dict[str, Any]:
+        if not script_name:
+            return {"success": False, "error": "Script name is required"}
+
+        args = args or []
+        base_dir = skill.directory
+        scripts_dir = base_dir / "scripts"
+        script_path = (scripts_dir / script_name).resolve()
+
+        if not str(script_path).startswith(str(scripts_dir.resolve())):
+            return {"success": False, "error": "Access denied: Script outside skill"}
+
+        if not script_path.exists() or not script_path.is_file():
+            return {"success": False, "error": f"Script not found: {script_name}"}
+
+        payload = {
+            "arguments": {"args": args},
+            "skill_dir": str(base_dir),
+            "instruction": skill.content,
+            "scripts_dir": str(scripts_dir),
+            "references_dir": str(base_dir / "references"),
+            "assets_dir": str(base_dir / "assets"),
+            "llm_config": None,
+            "mcp_config": None,
+            "script_path": str(script_path),
+        }
+
+        runner_code = self._build_sandbox_runner_code()
+        python_exec = os.getenv("SKILL_PYTHON_EXECUTABLE", "python3")
+        try:
+            completed = await asyncio.to_thread(
+                subprocess.run,
+                [
+                    python_exec,
+                    "-I",
+                    "-c",
+                    runner_code,
+                    json.dumps(payload, ensure_ascii=False),
+                ],
+                cwd=str(base_dir),
+                capture_output=True,
+                text=True,
+            )
+        except Exception as e:
+            return {"success": False, "error": f"Failed to run script: {str(e)}"}
+
+        stdout_text = (completed.stdout or "").strip()
+        stderr_text = (completed.stderr or "").strip()
+        if completed.returncode != 0:
+            return {
+                "success": False,
+                "error": "Skill script failed",
+                "stderr": stderr_text,
+                "stdout": stdout_text,
+            }
+
+        return {"success": True, "stdout": stdout_text, "stderr": stderr_text}
+
     def _resolve_skill_timeout(
         self,
         skill: Skill,
