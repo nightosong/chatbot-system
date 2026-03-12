@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import warnings
+import asyncio
 import json
 import os
 import time
@@ -15,10 +16,10 @@ import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi.responses import StreamingResponse  # type: ignore
-from fastapi import FastAPI, UploadFile, File, HTTPException  # type: ignore
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 import uvicorn
 from starlette.requests import Request  # type: ignore
 from starlette.responses import Response  # type: ignore
@@ -142,6 +143,29 @@ class AgentRunConfirmationRequest(BaseModel):
     run_started_at: str
     step_timestamp: str
     selected_action: str
+
+
+class AgentRunStartResponse(BaseModel):
+    """Response model for starting an agent run."""
+
+    run_id: str
+    status: str
+    conversation_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+
+class AgentRunInterruptResponse(BaseModel):
+    """Response model for interrupt request."""
+
+    run_id: str
+    status: str
+    interrupt_requested: bool
+
+
+RUN_TERMINAL_STATUSES: Set[str] = {"completed", "error", "interrupted"}
+active_agent_run_tasks: Dict[str, asyncio.Task] = {}
+active_agent_run_subscribers: Dict[str, Set[asyncio.Queue]] = {}
+agent_run_state_lock = asyncio.Lock()
 
 
 @app.get("/")
@@ -371,6 +395,444 @@ async def delete_conversation(conversation_id: str):
             "Delete conversation failed: conversation_id=%s", conversation_id
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _publish_agent_run_event(run_id: str, event: Dict[str, Any]) -> None:
+    """Publish event to in-memory subscribers for one run."""
+    async with agent_run_state_lock:
+        subscribers = list(active_agent_run_subscribers.get(run_id, set()))
+    for queue in subscribers:
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            # Keep execution non-blocking; slow subscribers can replay from DB.
+            continue
+
+
+def _sanitize_chunk_for_event_log(chunk: Dict[str, Any]) -> Dict[str, Any]:
+    sanitized = dict(chunk)
+    sanitized.pop("messages", None)
+    sanitized.setdefault("timestamp", datetime.now().isoformat())
+    return sanitized
+
+
+def _build_agent_persisted_turn_messages(
+    *,
+    request: AgentRequest,
+    history: List[dict],
+    final_messages: List[dict],
+    started_at: str,
+    status: str,
+    summary: str,
+    tool_calls_log: List[dict],
+    agent_run_events: List[dict],
+) -> List[dict]:
+    """Build assistant/user messages for persisted run result."""
+    finished_at = datetime.now().isoformat()
+    history_offset = 1 + len(history)
+    current_turn_messages = (
+        [dict(msg) for msg in final_messages[history_offset:]] if final_messages else []
+    )
+
+    if not current_turn_messages or current_turn_messages[0].get("role") != "user":
+        current_turn_messages.insert(
+            0,
+            {
+                "role": "user",
+                "content": request.message,
+                "timestamp": started_at,
+                "file_context": request.file_context,
+            },
+        )
+    elif not current_turn_messages[0].get("timestamp"):
+        current_turn_messages[0]["timestamp"] = started_at
+        if request.file_context and not current_turn_messages[0].get("file_context"):
+            current_turn_messages[0]["file_context"] = request.file_context
+
+    persisted_summary = (summary or "").strip()
+    run_payload = {
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "status": status,
+        "summary": persisted_summary,
+        "tool_calls_count": len(tool_calls_log),
+        "events": agent_run_events,
+        "anchor_timestamp": current_turn_messages[0].get("timestamp", started_at),
+    }
+
+    assistant_indices = [
+        idx
+        for idx, msg in enumerate(current_turn_messages)
+        if msg.get("role") == "assistant"
+    ]
+    if assistant_indices:
+        target_index = assistant_indices[-1]
+        target_message = current_turn_messages[target_index]
+        target_message.setdefault("metadata", {})
+        target_message["metadata"]["agent_run"] = run_payload
+        if not target_message.get("timestamp"):
+            target_message["timestamp"] = finished_at
+    else:
+        current_turn_messages.append(
+            {
+                "role": "assistant",
+                "content": persisted_summary or "Agent 执行完成",
+                "timestamp": finished_at,
+                "metadata": {"agent_run": run_payload},
+            }
+        )
+
+    for msg in current_turn_messages:
+        if not msg.get("timestamp"):
+            msg["timestamp"] = finished_at
+    return current_turn_messages
+
+
+async def _execute_agent_run_in_background(run_id: str, request_payload: Dict[str, Any]) -> None:
+    """Execute one agent request detached from frontend connection lifecycle."""
+    request = AgentRequest(**request_payload)
+    started_at = datetime.now().isoformat()
+    agent_run_events: List[dict] = []
+    tool_calls_log: List[dict] = []
+    final_messages: List[dict] = []
+    history: List[dict] = []
+    full_response = ""
+    active_conversation_id = request.conversation_id or request.project_id
+
+    async def persist_event(chunk: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = _sanitize_chunk_for_event_log(chunk)
+        agent_run_events.append(sanitized)
+        persisted = conversation_service.append_agent_run_event(run_id, sanitized)
+        await _publish_agent_run_event(run_id, persisted)
+        return persisted
+
+    async def ensure_not_interrupted() -> None:
+        if conversation_service.is_agent_run_interrupt_requested(run_id):
+            raise asyncio.CancelledError("Agent run interrupted by user")
+
+    try:
+        await persist_event(
+            {
+                "type": "status",
+                "title": "Agent 开始执行",
+                "detail": "正在分析请求并准备调用工具",
+            }
+        )
+
+        if active_conversation_id:
+            history = conversation_service.get_conversation_messages(active_conversation_id)
+
+        agent_config = request.agent_config or AgentConfig()
+        request_mcp_client = None
+        if agent_config.enable_mcp and agent_config.mcp_servers:
+            request_mcp_client = MCPClient(servers_config=agent_config.mcp_servers)
+
+        request_agent_service = AgentService(
+            mcp_client=request_mcp_client,
+            skill_manager=skill_manager,
+        )
+
+        async for chunk in request_agent_service.generate_stream(
+            message=request.message,
+            conversation_history=history,
+            file_context=request.file_context,
+            model_config=(request.llm_config.model_dump() if request.llm_config else None),
+            language=request.language,
+            enable_mcp=agent_config.enable_mcp,
+            enable_skills=agent_config.enable_skills,
+            selected_skill_names=agent_config.selected_skills,
+            max_iterations=agent_config.max_iterations,
+        ):
+            await ensure_not_interrupted()
+            if chunk.get("type") == "done" and "messages" in chunk:
+                final_messages = chunk["messages"]
+                continue
+
+            await persist_event(chunk)
+            if chunk.get("type") == "text":
+                full_response += chunk.get("content", "")
+            elif chunk.get("type") == "tool_call":
+                tool_calls_log.append(chunk)
+
+        persisted_messages = _build_agent_persisted_turn_messages(
+            request=request,
+            history=history,
+            final_messages=final_messages,
+            started_at=started_at,
+            status="completed",
+            summary=full_response,
+            tool_calls_log=tool_calls_log,
+            agent_run_events=agent_run_events,
+        )
+        conversation_id = conversation_service.save_messages(
+            messages=persisted_messages,
+            conversation_id=active_conversation_id,
+        )
+        finished_at = datetime.now().isoformat()
+        conversation_service.update_agent_run(
+            run_id,
+            status="completed",
+            summary=full_response.strip(),
+            conversation_id=conversation_id,
+            finished_at=finished_at,
+        )
+        await persist_event(
+            {
+                "type": "metadata",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "tool_calls_count": len(tool_calls_log),
+            }
+        )
+        await persist_event(
+            {
+                "type": "done",
+                "status": "completed",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "run_id": run_id,
+            }
+        )
+    except asyncio.CancelledError:
+        interrupted_summary = full_response.strip() or "Agent 执行已中断"
+        persisted_messages = _build_agent_persisted_turn_messages(
+            request=request,
+            history=history,
+            final_messages=final_messages,
+            started_at=started_at,
+            status="interrupted",
+            summary=interrupted_summary,
+            tool_calls_log=tool_calls_log,
+            agent_run_events=agent_run_events,
+        )
+        conversation_id = conversation_service.save_messages(
+            messages=persisted_messages,
+            conversation_id=active_conversation_id,
+        )
+        finished_at = datetime.now().isoformat()
+        conversation_service.update_agent_run(
+            run_id,
+            status="interrupted",
+            summary=interrupted_summary,
+            conversation_id=conversation_id,
+            finished_at=finished_at,
+        )
+        await persist_event(
+            {
+                "type": "interrupted",
+                "content": "用户已中断本次执行",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "run_id": run_id,
+            }
+        )
+        await persist_event(
+            {
+                "type": "done",
+                "status": "interrupted",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "run_id": run_id,
+            }
+        )
+    except Exception as e:
+        logger.exception("Agent background run failed: run_id=%s", run_id)
+        error_data = {
+            "type": "error",
+            "content": str(e),
+            "run_id": run_id,
+        }
+        await persist_event(error_data)
+        conversation_id = active_conversation_id
+        if request.message:
+            persisted_messages = [
+                {
+                    "role": "user",
+                    "content": request.message,
+                    "timestamp": started_at,
+                    "file_context": request.file_context,
+                },
+                {
+                    "role": "assistant",
+                    "content": f"❌ Agent 执行失败：{str(e)}",
+                    "timestamp": datetime.now().isoformat(),
+                    "metadata": {
+                        "agent_run": {
+                            "started_at": started_at,
+                            "finished_at": datetime.now().isoformat(),
+                            "status": "error",
+                            "summary": f"❌ Agent 执行失败：{str(e)}",
+                            "tool_calls_count": len(tool_calls_log),
+                            "events": agent_run_events,
+                            "anchor_timestamp": started_at,
+                        }
+                    },
+                },
+            ]
+            conversation_id = conversation_service.save_messages(
+                messages=persisted_messages,
+                conversation_id=active_conversation_id,
+            )
+        conversation_service.update_agent_run(
+            run_id,
+            status="error",
+            summary=f"❌ Agent 执行失败：{str(e)}",
+            error_message=str(e),
+            conversation_id=conversation_id,
+            finished_at=datetime.now().isoformat(),
+        )
+        await persist_event(
+            {
+                "type": "done",
+                "status": "error",
+                "conversation_id": conversation_id,
+                "project_id": conversation_id,
+                "run_id": run_id,
+            }
+        )
+    finally:
+        async with agent_run_state_lock:
+            active_agent_run_tasks.pop(run_id, None)
+
+
+@app.post("/api/agent/runs/start", response_model=AgentRunStartResponse)
+async def start_agent_run(request: AgentRequest):
+    """Start an agent run that survives frontend refresh/reconnect."""
+    if not request.llm_config:
+        raise HTTPException(status_code=400, detail="llm_config is required")
+
+    active_conversation_id = request.conversation_id or request.project_id
+    run_record = conversation_service.create_agent_run(
+        conversation_id=active_conversation_id,
+        request_payload=request.model_dump(),
+    )
+    run_id = run_record["run_id"]
+    task = asyncio.create_task(
+        _execute_agent_run_in_background(run_id, request.model_dump()),
+        name=f"agent-run-{run_id}",
+    )
+    async with agent_run_state_lock:
+        active_agent_run_tasks[run_id] = task
+
+    return AgentRunStartResponse(
+        run_id=run_id,
+        status="running",
+        conversation_id=active_conversation_id,
+        project_id=active_conversation_id,
+    )
+
+
+@app.get("/api/agent/runs/{run_id}")
+async def get_agent_run(run_id: str):
+    """Get persisted run status and metadata."""
+    run = conversation_service.get_agent_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    run["project_id"] = run.get("conversation_id")
+    return run
+
+
+@app.post("/api/agent/runs/{run_id}/interrupt", response_model=AgentRunInterruptResponse)
+async def interrupt_agent_run(run_id: str):
+    """Request interruption for a running agent run."""
+    run = conversation_service.get_agent_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+
+    if run.get("status") in RUN_TERMINAL_STATUSES:
+        return AgentRunInterruptResponse(
+            run_id=run_id,
+            status=str(run.get("status")),
+            interrupt_requested=bool(run.get("interrupt_requested")),
+        )
+
+    changed = conversation_service.request_agent_run_interrupt(run_id)
+    if changed:
+        event = conversation_service.append_agent_run_event(
+            run_id,
+            {
+                "type": "interrupt_requested",
+                "content": "收到用户中断请求",
+                "timestamp": datetime.now().isoformat(),
+                "run_id": run_id,
+            },
+        )
+        await _publish_agent_run_event(run_id, event)
+
+    updated = conversation_service.get_agent_run(run_id) or run
+    return AgentRunInterruptResponse(
+        run_id=run_id,
+        status=str(updated.get("status") or "running"),
+        interrupt_requested=bool(updated.get("interrupt_requested")),
+    )
+
+
+@app.get("/api/agent/runs/{run_id}/stream")
+async def stream_agent_run_events(run_id: str, after_seq: int = Query(0, ge=0)):
+    """Stream persisted agent run events (with replay) over SSE."""
+    run = conversation_service.get_agent_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+
+    async def event_generator():
+        last_seq = after_seq
+        replay_events = conversation_service.get_agent_run_events(run_id, after_seq=last_seq)
+        for event in replay_events:
+            last_seq = max(last_seq, int(event.get("seq") or 0))
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        queue: asyncio.Queue = asyncio.Queue(maxsize=512)
+        async with agent_run_state_lock:
+            subscribers = active_agent_run_subscribers.setdefault(run_id, set())
+            subscribers.add(queue)
+
+        try:
+            while True:
+                latest_run = conversation_service.get_agent_run(run_id)
+                if not latest_run:
+                    break
+
+                new_events = conversation_service.get_agent_run_events(
+                    run_id, after_seq=last_seq
+                )
+                for event in new_events:
+                    last_seq = max(last_seq, int(event.get("seq") or 0))
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+                if latest_run.get("status") in RUN_TERMINAL_STATUSES:
+                    if not new_events:
+                        done_data = {
+                            "type": "done",
+                            "run_id": run_id,
+                            "status": latest_run.get("status"),
+                            "conversation_id": latest_run.get("conversation_id"),
+                            "project_id": latest_run.get("conversation_id"),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                        yield f"data: {json.dumps(done_data, ensure_ascii=False)}\n\n"
+                    break
+
+                try:
+                    await asyncio.wait_for(queue.get(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            async with agent_run_state_lock:
+                subscribers = active_agent_run_subscribers.get(run_id)
+                if subscribers and queue in subscribers:
+                    subscribers.remove(queue)
+                if subscribers is not None and len(subscribers) == 0:
+                    active_agent_run_subscribers.pop(run_id, None)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/agent/chat")
@@ -700,7 +1162,9 @@ async def agent_chat_v2(request: AgentRequest):
         try:
             # Get conversation history
             if active_conversation_id:
-                history = conversation_service.get_messages(active_conversation_id)
+                history = conversation_service.get_conversation_messages(
+                    active_conversation_id
+                )
             
             # Configure agent
             agent_config = request.agent_config or AgentConfig()
@@ -722,7 +1186,9 @@ async def agent_chat_v2(request: AgentRequest):
                 message=request.message,
                 conversation_history=history,
                 file_context=request.file_context,
-                model_config=request.model_config,
+                model_config=(
+                    request.llm_config.model_dump() if request.llm_config else None
+                ),
                 language=request.language,
                 enable_mcp=agent_config.enable_mcp,
                 enable_skills=agent_config.enable_skills,

@@ -100,6 +100,64 @@
   cursor: not-allowed;
 }
 
+.message-input button.interrupt-button {
+  background: linear-gradient(135deg, #ff7a7a 0%, #ff4f7d 52%, #ff6b99 100%);
+  border-color: rgba(235, 74, 124, 0.95);
+  box-shadow: 0 12px 24px rgba(255, 92, 141, 0.32);
+  position: relative;
+  overflow: hidden;
+}
+
+.message-input button.interrupt-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.35), transparent 55%);
+  animation: interruptPulse 1.35s ease-in-out infinite;
+}
+
+.message-input button.interrupt-button.interrupting {
+  background: linear-gradient(135deg, #ff6060 0%, #ff3a6a 52%, #ff5585 100%);
+  border-color: rgba(220, 60, 110, 0.95);
+  opacity: 0.88;
+}
+
+.message-input button.interrupt-button.interrupting::after {
+  animation: interruptPulse 0.85s ease-in-out infinite;
+}
+
+.interrupt-button-content {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  justify-content: center;
+}
+
+.interrupt-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.interrupt-label {
+  flex-shrink: 0;
+}
+
+@keyframes interruptPulse {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(0.98);
+    opacity: 0.35;
+  }
+}
+
 @media (max-width: 768px) {
   .message-input {
     flex-direction: column;

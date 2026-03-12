@@ -4,12 +4,18 @@ import './MessageInput.css';
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   disabled: boolean;
+  isRunning?: boolean;
+  isInterrupting?: boolean;
+  onInterrupt?: () => void;
   leadingAccessory?: React.ReactNode;
 }
 
 const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   disabled,
+  isRunning = false,
+  isInterrupting = false,
+  onInterrupt,
   leadingAccessory,
 }) => {
   const [message, setMessage] = useState('');
@@ -19,6 +25,14 @@ const MessageInput: React.FC<MessageInputProps> = ({
       onSendMessage(message);
       setMessage('');
     }
+  };
+
+  const handleActionClick = () => {
+    if (isRunning) {
+      onInterrupt?.();
+      return;
+    }
+    handleSend();
   };
 
   const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -43,8 +57,21 @@ const MessageInput: React.FC<MessageInputProps> = ({
           rows={3}
         />
       </div>
-      <button onClick={handleSend} disabled={disabled || !message.trim()}>
-        发送
+      <button
+        onClick={handleActionClick}
+        disabled={isRunning ? isInterrupting : disabled || !message.trim()}
+        className={isRunning ? (isInterrupting ? 'interrupt-button interrupting' : 'interrupt-button') : ''}
+      >
+        {isRunning ? (
+          <span className="interrupt-button-content">
+            <svg className="interrupt-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" />
+            </svg>
+            <span className="interrupt-label">{isInterrupting ? '中断中' : '中断'}</span>
+          </span>
+        ) : (
+          '发送'
+        )}
       </button>
     </div>
   );

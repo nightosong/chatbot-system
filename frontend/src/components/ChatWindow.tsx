@@ -6,7 +6,15 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import FileUpload from './FileUpload';
 import { Message, ChatMode, AgentStreamEvent } from '../types';
-import { sendMessage, sendAgentMessage, getConversation, persistAgentRunConfirmation } from '../services/api';
+import {
+  sendMessage,
+  getConversation,
+  persistAgentRunConfirmation,
+  startAgentRun,
+  streamAgentRun,
+  interruptAgentRun,
+  getAgentRun,
+} from '../services/api';
 import { modelConfigService } from '../services/modelConfig';
 import { languageConfigService } from '../services/languageConfig';
 import { agentConfigService } from '../services/agentConfig';
@@ -71,7 +79,7 @@ interface AgentStep {
 
 interface AgentRun {
   id: number;
-  status: 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'error' | 'interrupted';
   steps: AgentStep[];
   startedAt: string;
   finishedAt?: string;
@@ -110,6 +118,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const [collapsedRuns, setCollapsedRuns] = useState<Record<number, boolean>>({});
   const [mediaPreview, setMediaPreview] = useState<MediaPreviewItem | null>(null);
   const [previewOffset, setPreviewOffset] = useState({ x: 0, y: 0 });
+  const [isInterruptRequested, setIsInterruptRequested] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const stepIdRef = useRef<number>(0);
   const runIdRef = useRef<number>(0);
@@ -123,6 +132,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   const pendingConfirmSavesRef = useRef<
     Array<{ runStartedAt: string; stepTimestamp: string; selectedAction: string }>
   >([]);
+  const activeRunIdRef = useRef<string | null>(null);
+  const activeRunSeqRef = useRef<number>(0);
+  const runCompletionHandledRef = useRef<boolean>(false);
+
+  const ACTIVE_AGENT_RUN_STORAGE_KEY = 'chatbot-system:active-agent-run';
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -227,6 +241,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       runIdRef.current = 0;
       stepIdRef.current = 0;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const handleSendMessage = async (content: string) => {
@@ -318,17 +333,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
     content: string,
     llmConfig: any,
     language: string | null,
-    anchorTimestamp?: string
+    anchorTimestamp?: string,
+    existingRunId?: string
   ) => {
     const agentConfig = agentConfigService.getAgentConfig();
 
     let latestLlmSegment = '';
+    let finalRunStatus: AgentRun['status'] = 'running';
     let currentLlmStepId: number | null = null;
     let currentLlmText = '';
     let activeBatchStepId: number | null = null;
     let activeBatchExecutionQueue: Array<{ tool: string; itemId: string }> = [];
     const runId = ++runIdRef.current;
+    const runStartTime = new Date().toISOString();
     setActiveRunId(runId);
+    setIsInterruptRequested(false);
     setCollapsedRuns((prev) => ({ ...prev, [runId]: false }));
     setAgentRuns((prev) => [
       ...prev,
@@ -336,10 +355,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         id: runId,
         status: 'running',
         steps: [],
-        startedAt: new Date().toISOString(),
-        anchorTimestamp,
+        startedAt: runStartTime,
+        anchorTimestamp: anchorTimestamp || runStartTime,
       },
     ]);
+    runCompletionHandledRef.current = false;
+    activeRunSeqRef.current = 0;
 
     const appendStep = (
       targetRunId: number,
@@ -527,7 +548,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         return;
       }
 
+      if (typeof event.seq === 'number') {
+        if (event.seq <= activeRunSeqRef.current) {
+          return;
+        }
+        activeRunSeqRef.current = event.seq;
+      }
+
       flushLlmOutputStep();
+
+      if (event.type === 'status') {
+        addStep({
+          type: 'status',
+          title: event.title || '状态更新',
+          detail: normalizeDetail(event.detail ?? event.content ?? ''),
+        });
+        return;
+      }
 
       if (event.type === 'thinking') {
         addStep({
@@ -624,8 +661,45 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           title: '执行完成',
           detail: `工具调用次数: ${event.tool_calls_count ?? 0}`,
         });
-        updateRunStatus(runId, 'completed');
+        finalRunStatus = 'completed';
+        updateRunStatus(runId, finalRunStatus);
         onConversationUpdate();
+        return;
+      }
+
+      if (event.type === 'interrupt_requested') {
+        addStep({
+          type: 'status',
+          title: '收到中断请求',
+          detail: event.content || '正在等待当前步骤安全停止',
+        });
+        setIsInterruptRequested(true);
+        return;
+      }
+
+      if (event.type === 'interrupted') {
+        addStep({
+          type: 'error',
+          title: '执行已中断',
+          detail: event.content || '已按用户请求中断',
+        });
+        finalRunStatus = 'interrupted';
+        updateRunStatus(runId, finalRunStatus);
+        setIsInterruptRequested(false);
+        return;
+      }
+
+      if (event.type === 'done') {
+        const status = (event.status || '').toLowerCase();
+        if (status === 'error') {
+          finalRunStatus = 'error';
+        } else if (status === 'interrupted') {
+          finalRunStatus = 'interrupted';
+        } else if (status === 'completed') {
+          finalRunStatus = 'completed';
+        }
+        updateRunStatus(runId, finalRunStatus);
+        runCompletionHandledRef.current = true;
         return;
       }
 
@@ -635,18 +709,14 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           title: '执行异常',
           detail: event.content || 'Unknown error',
         });
-        updateRunStatus(runId, 'error');
+        finalRunStatus = 'error';
+        updateRunStatus(runId, finalRunStatus);
       }
     };
 
-    addStep({
-      type: 'status',
-      title: 'Agent 开始执行',
-      detail: '正在分析请求并准备调用工具',
-    });
-
-    await sendAgentMessage(
-      {
+    let runStreamId = existingRunId || '';
+    if (!runStreamId) {
+      const started = await startAgentRun({
         message: content,
         conversation_id: conversationId,
         project_id: conversationId,
@@ -654,15 +724,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         llm_config: llmConfig,
         language: language,
         agent_config: agentConfig,
-      },
-      handleAgentEvent
-    );
+      });
+      runStreamId = started.run_id;
+    }
+
+    activeRunIdRef.current = runStreamId;
+    localStorage.setItem(ACTIVE_AGENT_RUN_STORAGE_KEY, runStreamId);
+    await streamAgentRun(runStreamId, handleAgentEvent);
     flushLlmOutputStep();
+
+    if (!runCompletionHandledRef.current && runStreamId) {
+      try {
+        const latestRun = await getAgentRun(runStreamId);
+        const status = (latestRun.status || '').toLowerCase();
+        if (status === 'error') finalRunStatus = 'error';
+        else if (status === 'interrupted') finalRunStatus = 'interrupted';
+        else if (status === 'completed') finalRunStatus = 'completed';
+      } catch (error) {
+        console.error('Failed to get latest run status:', error);
+      }
+    }
 
     setAgentRuns((prev) =>
       prev.map((run) =>
         run.id === runId && run.status === 'running'
-          ? { ...run, status: 'completed', finishedAt: new Date().toISOString() }
+          ? { ...run, status: finalRunStatus, finishedAt: new Date().toISOString() }
           : run
       )
     );
@@ -679,8 +765,64 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       )
     );
 
+    activeRunIdRef.current = null;
+    activeRunSeqRef.current = 0;
+    localStorage.removeItem(ACTIVE_AGENT_RUN_STORAGE_KEY);
     setActiveRunId(null);
+    setIsInterruptRequested(false);
   };
+
+  const handleInterruptActiveRun = async () => {
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    setIsInterruptRequested(true);
+    try {
+      await interruptAgentRun(runId);
+    } catch (error) {
+      console.error('Failed to interrupt active run:', error);
+      setIsInterruptRequested(false);
+    }
+  };
+
+  useEffect(() => {
+    if (chatMode !== 'agent') return;
+    const storedRunId = localStorage.getItem(ACTIVE_AGENT_RUN_STORAGE_KEY);
+    if (!storedRunId || activeRunIdRef.current || isLoading) return;
+
+    let cancelled = false;
+    const resumeRun = async () => {
+      try {
+        const runStatus = await getAgentRun(storedRunId);
+        const terminalStatuses = ['completed', 'error', 'interrupted'];
+        if (terminalStatuses.includes((runStatus.status || '').toLowerCase())) {
+          localStorage.removeItem(ACTIVE_AGENT_RUN_STORAGE_KEY);
+          return;
+        }
+
+        if (cancelled) return;
+        setIsLoading(true);
+        await handleAgentMessage(
+          '',
+          null,
+          null,
+          runStatus.started_at || new Date().toISOString(),
+          storedRunId
+        );
+      } catch (error) {
+        console.error('Failed to resume active agent run:', error);
+        localStorage.removeItem(ACTIVE_AGENT_RUN_STORAGE_KEY);
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void resumeRun();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatMode, conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleRunCollapsed = (runId: number) => {
     setCollapsedRuns((prev) => ({
@@ -733,6 +875,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
       const status: AgentRun['status'] =
         payload.status === 'error'
           ? 'error'
+          : payload.status === 'interrupted'
+          ? 'interrupted'
           : payload.status === 'running'
           ? 'running'
           : 'completed';
@@ -1693,6 +1837,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const formatRunStatusLabel = (status: AgentRun['status']): string => {
     if (status === 'running') return '执行中';
+    if (status === 'interrupted') return '已中断';
     if (status === 'completed') return '已完成';
     return '异常';
   };
@@ -1843,6 +1988,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const getAgentRunHeadline = (run: AgentRun): string => {
     if (run.status === 'running') return 'AI 正在处理你的请求';
+    if (run.status === 'interrupted') return 'AI 执行已被中断';
     if (run.status === 'error') return 'AI 执行过程中出现异常';
     return run.summary?.trim() ? 'AI 已完成本轮处理' : 'AI 已完成执行';
   };
@@ -1934,7 +2080,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
           {!collapsedRuns[run.id] && (
             <div className="agent-live-steps">
               {run.steps.map((step, index) => {
-                const isLast = index === run.steps.length - 1;
                 const activeStepIndex =
                   run.status === 'running' && run.id === activeRunId
                     ? run.steps.length - 1
@@ -2119,6 +2264,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
         <MessageInput
           onSendMessage={handleSendMessage}
           disabled={isLoading}
+          isRunning={chatMode === 'agent' && isLoading}
+          isInterrupting={isInterruptRequested}
+          onInterrupt={handleInterruptActiveRun}
           leadingAccessory={<FileUpload onFileUpload={handleFileUpload} compact />}
         />
       </div>

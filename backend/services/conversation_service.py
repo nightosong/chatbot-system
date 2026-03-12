@@ -51,6 +51,43 @@ class ConversationService:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id)
             )
         """)
+
+        # Agent runs table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_runs (
+                run_id TEXT PRIMARY KEY,
+                conversation_id TEXT,
+                request_payload TEXT,
+                status TEXT,
+                summary TEXT,
+                error_message TEXT,
+                started_at TEXT,
+                finished_at TEXT,
+                updated_at TEXT,
+                interrupt_requested INTEGER DEFAULT 0,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+            )
+            """
+        )
+
+        # Agent run event log
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS agent_run_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT,
+                seq INTEGER,
+                event_type TEXT,
+                payload TEXT,
+                timestamp TEXT,
+                FOREIGN KEY (run_id) REFERENCES agent_runs(run_id)
+            )
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_agent_run_events_run_seq ON agent_run_events(run_id, seq)"
+        )
         
         conn.commit()
         conn.close()
@@ -375,3 +412,199 @@ class ConversationService:
         if len(title) > max_length:
             title = title[:max_length] + "..."
         return title
+
+    def create_agent_run(
+        self, conversation_id: Optional[str], request_payload: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Create a new persisted agent run."""
+        run_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        payload_json = (
+            json.dumps(request_payload, ensure_ascii=False) if request_payload else None
+        )
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO agent_runs (
+                run_id, conversation_id, request_payload, status,
+                started_at, updated_at, interrupt_requested
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (run_id, conversation_id, payload_json, "running", now, now, 0),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "run_id": run_id,
+            "conversation_id": conversation_id,
+            "status": "running",
+            "started_at": now,
+            "updated_at": now,
+            "interrupt_requested": False,
+        }
+
+    def append_agent_run_event(self, run_id: str, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist one agent run event and return with sequence."""
+        now = datetime.now().isoformat()
+        event_type = str(event.get("type", "unknown"))
+        payload_json = json.dumps(event, ensure_ascii=False)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM agent_run_events WHERE run_id = ?",
+            (run_id,),
+        )
+        next_seq = int(cursor.fetchone()[0])
+        cursor.execute(
+            """
+            INSERT INTO agent_run_events (run_id, seq, event_type, payload, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (run_id, next_seq, event_type, payload_json, now),
+        )
+        cursor.execute(
+            "UPDATE agent_runs SET updated_at = ? WHERE run_id = ?",
+            (now, run_id),
+        )
+        conn.commit()
+        conn.close()
+
+        enriched = dict(event)
+        enriched["run_id"] = run_id
+        enriched["seq"] = next_seq
+        enriched.setdefault("timestamp", now)
+        return enriched
+
+    def get_agent_run_events(
+        self, run_id: str, after_seq: int = 0, limit: int = 500
+    ) -> List[Dict[str, Any]]:
+        """Get persisted events for one run after a sequence."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT seq, payload, timestamp
+            FROM agent_run_events
+            WHERE run_id = ? AND seq > ?
+            ORDER BY seq ASC
+            LIMIT ?
+            """,
+            (run_id, after_seq, limit),
+        )
+
+        events: List[Dict[str, Any]] = []
+        for seq, payload_raw, timestamp in cursor.fetchall():
+            try:
+                payload = json.loads(payload_raw) if payload_raw else {}
+            except json.JSONDecodeError:
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {"type": "unknown", "content": str(payload)}
+            payload["run_id"] = run_id
+            payload["seq"] = int(seq)
+            payload.setdefault("timestamp", timestamp)
+            events.append(payload)
+
+        conn.close()
+        return events
+
+    def get_agent_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+        """Get a single agent run by run_id."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT run_id, conversation_id, status, summary, error_message,
+                   started_at, finished_at, updated_at, interrupt_requested
+            FROM agent_runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        return {
+            "run_id": row[0],
+            "conversation_id": row[1],
+            "status": row[2],
+            "summary": row[3],
+            "error_message": row[4],
+            "started_at": row[5],
+            "finished_at": row[6],
+            "updated_at": row[7],
+            "interrupt_requested": bool(row[8]),
+        }
+
+    def update_agent_run(
+        self,
+        run_id: str,
+        *,
+        status: Optional[str] = None,
+        summary: Optional[str] = None,
+        error_message: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        finished_at: Optional[str] = None,
+    ) -> None:
+        """Update mutable fields for one agent run."""
+        update_fields: List[str] = []
+        values: List[Any] = []
+        if status is not None:
+            update_fields.append("status = ?")
+            values.append(status)
+        if summary is not None:
+            update_fields.append("summary = ?")
+            values.append(summary)
+        if error_message is not None:
+            update_fields.append("error_message = ?")
+            values.append(error_message)
+        if conversation_id is not None:
+            update_fields.append("conversation_id = ?")
+            values.append(conversation_id)
+        if finished_at is not None:
+            update_fields.append("finished_at = ?")
+            values.append(finished_at)
+
+        now = datetime.now().isoformat()
+        update_fields.append("updated_at = ?")
+        values.append(now)
+        values.append(run_id)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE agent_runs SET {', '.join(update_fields)} WHERE run_id = ?",
+            tuple(values),
+        )
+        conn.commit()
+        conn.close()
+
+    def request_agent_run_interrupt(self, run_id: str) -> bool:
+        """Mark one run as interruption requested."""
+        now = datetime.now().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE agent_runs SET interrupt_requested = 1, updated_at = ? WHERE run_id = ?",
+            (now, run_id),
+        )
+        changed = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return changed
+
+    def is_agent_run_interrupt_requested(self, run_id: str) -> bool:
+        """Check whether run has interruption request."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT interrupt_requested FROM agent_runs WHERE run_id = ?",
+            (run_id,),
+        )
+        row = cursor.fetchone()
+        conn.close()
+        return bool(row[0]) if row else False

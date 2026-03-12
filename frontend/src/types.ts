@@ -140,6 +140,26 @@ export interface AgentRequest {
   agent_config?: AgentConfig;
 }
 
+export interface AgentRunStartResponse {
+  run_id: string;
+  status: string;
+  conversation_id?: string | null;
+  project_id?: string | null;
+}
+
+export interface AgentRunStatusResponse {
+  run_id: string;
+  conversation_id?: string | null;
+  project_id?: string | null;
+  status: 'running' | 'completed' | 'error' | 'interrupted' | string;
+  summary?: string | null;
+  error_message?: string | null;
+  started_at?: string;
+  finished_at?: string | null;
+  updated_at?: string;
+  interrupt_requested?: boolean;
+}
+
 export interface AgentStreamEvent {
   type:
     | 'text'
@@ -149,8 +169,14 @@ export interface AgentStreamEvent {
     | 'error'
     | 'done'
     | 'metadata'
+    | 'status'
+    | 'interrupted'
+    | 'interrupt_requested'
     | 'confirmation_required'
     | 'permission_required';
+  run_id?: string;
+  seq?: number;
+  status?: string;
   timestamp?: string;
   content?: string;
   tool?: string;

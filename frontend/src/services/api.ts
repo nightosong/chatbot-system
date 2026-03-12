@@ -8,6 +8,8 @@ import {
   CreateConversationResponse,
   AgentRequest,
   AgentStreamEvent,
+  AgentRunStartResponse,
+  AgentRunStatusResponse,
   AgentSkill,
   BackendLogsResponse,
   SkillLoadResponse,
@@ -36,6 +38,104 @@ export const sendMessage = async (request: ChatRequest): Promise<ChatResponse> =
  * @returns Promise that resolves when stream is complete
  */
 export const sendAgentMessage = async (
+  request: AgentRequest,
+  onEvent: (event: AgentStreamEvent) => void
+): Promise<void> => {
+  const start = await api.post<AgentRunStartResponse>('/api/agent/runs/start', request);
+  const runId = start.data.run_id;
+  await streamAgentRun(runId, onEvent);
+};
+
+export const startAgentRun = async (
+  request: AgentRequest
+): Promise<AgentRunStartResponse> => {
+  const response = await api.post<AgentRunStartResponse>('/api/agent/runs/start', request);
+  return response.data;
+};
+
+export const getAgentRun = async (runId: string): Promise<AgentRunStatusResponse> => {
+  const response = await api.get<AgentRunStatusResponse>(`/api/agent/runs/${runId}`);
+  return response.data;
+};
+
+export const interruptAgentRun = async (
+  runId: string
+): Promise<{ run_id: string; status: string; interrupt_requested: boolean }> => {
+  const response = await api.post<{ run_id: string; status: string; interrupt_requested: boolean }>(
+    `/api/agent/runs/${runId}/interrupt`
+  );
+  return response.data;
+};
+
+export const streamAgentRun = async (
+  runId: string,
+  onEvent: (event: AgentStreamEvent) => void,
+  afterSeq?: number
+): Promise<void> => {
+  const searchParams = new URLSearchParams();
+  if (typeof afterSeq === 'number' && afterSeq >= 0) {
+    searchParams.set('after_seq', String(afterSeq));
+  }
+  const query = searchParams.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/api/agent/runs/${runId}/stream${query ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        break;
+      }
+
+      // Decode chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            onEvent(data);
+            
+            // Stop if done
+            if (data.type === 'done') {
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e, line);
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+};
+
+export const sendAgentMessageLegacy = async (
   request: AgentRequest,
   onEvent: (event: AgentStreamEvent) => void
 ): Promise<void> => {
